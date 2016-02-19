@@ -42,8 +42,9 @@
 #ifndef _US_FFEATURES_H
 #define _US_FFEATURES_H
 
-void us_ff_register(cst_features *ffunctions);
+void us_ff_register(cst_ffunction *ffunctions);
 
-extern const cst_val * const * const us_gpos[];
+extern const cst_val * us_gpos[];
+extern const char * const * const us_gpos_words[];
 
 #endif /* _US_FFEATURES_H */

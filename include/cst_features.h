@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -52,16 +58,11 @@ typedef struct cst_featvalpair_struct {
 
 typedef struct cst_features_struct {
     struct cst_featvalpair_struct *head;
-    cst_alloc_context ctx;
     cst_val *owned_strings; /* fnames that are owned by this struct */
-
-    /* Link to other cst_features that we search too */
-    const struct cst_features_struct *linked; 
 } cst_features;
 
 /* Constructor functions */
 cst_features *new_features(void);
-cst_features *new_features_local(cst_alloc_context ctx);
 void delete_features(cst_features *f);
 
 /* Accessor functions */
@@ -94,9 +95,9 @@ const char *feat_own_string(cst_features *f,const char *name);
 CST_VAL_USER_TYPE_DCLS(features,cst_features)
 
 int feat_copy_into(const cst_features *from,cst_features *to);
-/* Link FROM into TO so FROM's features will be searched after TO's features */
-int feat_link_into(const cst_features *from,cst_features *to);
-/* For debugging */
-int cst_feat_print(cst_file fd,const cst_features *f);
+
+#if defined(CART_DEBUG) || defined(SSML_DEBUG)
+int bell_feat_print(const cst_features *f);
+#endif // defined(CART_DEBUG) || defined(SSML_DEBUG)
 
 #endif

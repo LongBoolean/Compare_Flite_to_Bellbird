@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -41,31 +47,22 @@
 #include "cst_voice.h"
 #include "flite.h"
 
-CST_VAL_REGISTER_TYPE(voice,cst_voice)
-
 cst_voice *new_voice()
 {
     cst_voice *v = cst_alloc(struct cst_voice_struct,1);
 
     v->features = new_features();
-    v->ffunctions = new_features();
+    v->ffunctions = cst_alloc(cst_ffunction,256);
 
     return v;
 }
 
 void delete_voice(cst_voice *v)
 {
-    if (v)
+    if (v != NULL)
     {
-        if (feat_present(v->features,"voxdata"))
-        {
-            if (feat_present(v->features,"clunit_db"))
-                flite_munmap_clunit_voxdata(v);
-        }
-
 	delete_features(v->features);
-	delete_features(v->ffunctions);
+	cst_free(v->ffunctions);
 	cst_free(v);
     }
 }
-

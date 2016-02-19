@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -44,99 +50,39 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include "cst_string.h"
-#include "cst_regex.h"
-#include "cst_val.h"
 #include "cst_features.h"
 #include "cst_item.h"
-#include "cst_relation.h"
+#include "cst_lexicon.h"
+#include "cst_string.h"
+#include "cst_tokenstream.h"
 #include "cst_utterance.h"
 #include "cst_wave.h"
-#include "cst_track.h"
-
-#include "cst_cart.h"
-#include "cst_phoneset.h"
 #include "cst_voice.h"
-#include "cst_audio.h"
 
-#include "cst_utt_utils.h"
-#include "cst_lexicon.h"
-#include "cst_synth.h"
-#include "cst_units.h"
-#include "cst_tokenstream.h"
-
-extern cst_val *flite_voice_list;
 extern cst_lang flite_lang_list[20];
 
 /* Public functions */
-int flite_init();
 
 /* General top level functions */
-cst_voice *flite_voice_select(const char *name);
-cst_voice *flite_voice_load(const char *voice_filename);
-int flite_voice_dump(cst_voice *voice, const char *voice_filename);
-float flite_file_to_speech(const char *filename, 
-			   cst_voice *voice,
+float flite_text_to_speech(const char *text, cst_voice *voice,
 			   const char *outtype);
-float flite_text_to_speech(const char *text, 
-			   cst_voice *voice,
-			   const char *outtype);
-float flite_phones_to_speech(const char *text, 
-			     cst_voice *voice,
-			     const char *outtype);
-float flite_ssml_file_to_speech(const char *filename,
-                                cst_voice *voice,
+float flite_ssml_file_to_speech(const char *filename, cst_voice *voice,
                                 const char *outtype);
-float flite_ssml_text_to_speech(const char *text,
-                                cst_voice *voice,
+float flite_ssml_text_to_speech(const char *text, cst_voice *voice,
                                 const char *outtype);
-int flite_voice_add_lex_addenda(cst_voice *v, const cst_string *lexfile);
 
-/* Lower lever user functions */
-cst_wave *flite_text_to_wave(const char *text,cst_voice *voice);
-cst_utterance *flite_synth_text(const char *text,cst_voice *voice);
-cst_utterance *flite_synth_phones(const char *phones,cst_voice *voice);
-
-float flite_ts_to_speech(cst_tokenstream *ts, 
-                         cst_voice *voice,
+/* Lower level user functions */
+float flite_ts_to_speech(cst_tokenstream *ts, cst_voice *voice,
                          const char *outtype);
-cst_utterance *flite_do_synth(cst_utterance *u,
-                              cst_voice *voice,
+cst_utterance *flite_do_synth(cst_utterance *u, cst_voice *voice,
                               cst_uttfunc synth);
-float flite_process_output(cst_utterance *u,
-                           const char *outtype,
+float flite_process_output(cst_utterance *u, const char *outtype,
                            int append);
-
-/* for voices with external voxdata */
-int flite_mmap_clunit_voxdata(const char *voxdir, cst_voice *voice);
-int flite_munmap_clunit_voxdata(cst_voice *voice);
-
-/* flite public export wrappers for features access */
-int flite_get_param_int(const cst_features *f, const char *name,int def);
-float flite_get_param_float(const cst_features *f, const char *name, float def);
-const char *flite_get_param_string(const cst_features *f, const char *name, const char *def);
-const cst_val *flite_get_param_val(const cst_features *f, const char *name, cst_val *def);
-void flite_feat_set_int(cst_features *f, const char *name, int v);
-void flite_feat_set_float(cst_features *f, const char *name, float v);
-void flite_feat_set_string(cst_features *f, const char *name, const char *v);
-void flite_feat_set(cst_features *f, const char *name,const cst_val *v);
-int flite_feat_remove(cst_features *f, const char *name);
-
-const char *flite_ffeature_string(const cst_item *item,const char *featpath);
-int flite_ffeature_int(const cst_item *item,const char *featpath);
-float flite_ffeature_float(const cst_item *item,const char *featpath);
-const cst_val *flite_ffeature(const cst_item *item,const char *featpath);
-cst_item* flite_path_to_item(const cst_item *item,const char *featpath);
 
 /* These functions are *not* thread-safe, they are designed to be called */
 /* before the initial synthesis occurs */
-int flite_add_voice(cst_voice *voice);
-int flite_add_lang(const char *langname,
-                   void (*lang_init)(cst_voice *vox),
+int flite_add_lang(const char *langname, void (*lang_init)(cst_voice *vox),
                    cst_lexicon *(*lex_init)());
-/* These are init functions for generic grapheme based voices */
-void utf8_grapheme_lang_init(cst_voice *v);
-cst_lexicon *utf8_grapheme_lex_init(void);
 
 #ifdef __cplusplus
 }  /* extern "C" */

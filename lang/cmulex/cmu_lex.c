@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -39,14 +45,13 @@
 /*************************************************************************/
 
 #include "flite.h"
+#include "bell_file.h"
 
 #include "cmu_lex.h"
 
-extern const int cmu_lex_entry[];
 extern const unsigned char cmu_lex_data[];
-extern const int cmu_lex_num_entries;
 extern const int cmu_lex_num_bytes;
-extern const char * const cmu_lex_phone_table[54];
+extern const char * const cmu_lex_phone_table[];
 extern const char * const cmu_lex_phones_huff_table[];
 extern const char * const cmu_lex_entries_huff_table[];
 
@@ -54,97 +59,6 @@ static int cmu_is_vowel(const char *p);
 static int cmu_is_silence(const char *p);
 static int cmu_has_vowel_in_list(const cst_val *v);
 static int cmu_has_vowel_in_syl(const cst_item *i);
-static int cmu_sonority(const char *p);
-
-static const char * const addenda0[] = { "p,", NULL };
-static const char * const addenda1[] = { "p.", NULL };
-static const char * const addenda2[] = { "p(", NULL };
-static const char * const addenda3[] = { "p)", NULL };
-static const char * const addenda4[] = { "p[", NULL };
-static const char * const addenda5[] = { "p]", NULL };
-static const char * const addenda6[] = { "p{", NULL };
-static const char * const addenda7[] = { "p}", NULL };
-static const char * const addenda8[] = { "p:", NULL };
-static const char * const addenda9[] = { "p;", NULL };
-static const char * const addenda10[] = { "p?", NULL};
-static const char * const addenda11[] = { "p!", NULL };
-static const char * const addenda12[] = { "n@", "ae1", "t", NULL };
-static const char * const addenda13[] = { "n#", "hh", "ae1","sh", NULL };
-static const char * const addenda14[] = { "n$", "d", "aa1", "l", "er", NULL };
-static const char * const addenda15[] = { "n%", "p", "er", "s", "eh1", "n", "t", NULL };
-static const char * const addenda16[] = { "n^", "k", "eh1", "r", "eh1", "t",  NULL };
-static const char * const addenda17[] = { "n&","ae1","m","p","er","s","ae1","n","d", NULL };
-static const char * const addenda18[] = { "n*","ae1","s","t","er","ih1","s","k",NULL };
-static const char * const addenda19[] = { "n|","b","aa1","r",NULL };
-static const char * const addenda20[] = { "n\\","b","ae1","k","s","l","ae1","sh",NULL };
-static const char * const addenda21[] = { "n=","iy1","k","w","ax","l","z",NULL};
-static const char * const addenda22[] = { "n+","p","l","ah1","s",NULL};
-static const char * const addenda23[] = { "n~","t","ih1","l","d","ax",NULL};
-static const char * const addenda24[] = { "p'",NULL};
-static const char * const addenda25[] = { "p`",NULL};
-static const char * const addenda26[] = { "p\"",NULL};
-static const char * const addenda27[] = { "p-",NULL};
-static const char * const addenda28[] = { "p<",NULL};
-static const char * const addenda29[] = { "p>",NULL};
-static const char * const addenda30[] = { "n_","ah1","n","d","er","s","k","ao1","r",NULL};
-static const char * const addenda31[] = { "s's","z",NULL};
-static const char * const addenda32[] = { "nim","ay1","m",NULL};
-static const char * const addenda33[] = { "vdoesnt","d","ah1","z","n","t",NULL};
-static const char * const addenda34[] = { "vyoull","y","uw1","l",NULL};
-static const char * const addenda35[] = { "n/","s","l","ae1","sh",NULL};
-
-static const char * const addenda36[] = { "nin","ih","n",NULL};
-static const char * const addenda37[] = { "nto","t","ax",NULL};
-static const char * const addenda38[] = { "0_a","ey",NULL};
-static const char * const addenda39[] = { "vhavent","hh","ae1","v","ax","n","t",NULL};
-static const char * const addenda40[] = { "nemail","iy1","m","ey1","l",NULL};
-static const char * const addenda41[] = { "nshit","sh","ih1","t",NULL};
-
-static const char * const * const addenda[] = {
-    addenda0,
-    addenda1,
-    addenda2,
-    addenda3,
-    addenda4,
-    addenda5,
-    addenda6,
-    addenda7,
-    addenda8,
-    addenda9,
-    addenda10,
-    addenda11,
-    addenda12,
-    addenda13,
-    addenda14,
-    addenda15,
-    addenda16,
-    addenda17,
-    addenda18,
-    addenda19,
-    addenda20,
-    addenda21,
-    addenda22,
-    addenda23,
-    addenda24,
-    addenda25,
-    addenda26,
-    addenda27,
-    addenda28,
-    addenda29,
-    addenda30,
-    addenda31,
-    addenda32,
-    addenda33,
-    addenda34,
-    addenda35,
-
-    addenda36,
-    addenda37,
-    addenda38,
-    addenda39,
-    addenda40,
-    addenda41,
-    NULL };
 
 static int cmu_is_silence(const char *p)
 {
@@ -181,52 +95,6 @@ static int cmu_is_vowel(const char *p)
 	return FALSE;
     else
 	return TRUE;
-}
-
-static int cmu_sonority(const char *p)
-{
-    /* A bunch of hacks for US English phoneset */
-    if (cmu_is_vowel(p) || (cmu_is_silence(p)))
-	return 5;
-    else if (strchr("wylr",p[0]) != NULL)
-	return 4;  /* glides/liquids */
-    else if (strchr("nm",p[0]) != NULL)
-	return 3;  /* nasals */
-    else if (strchr("bdgjlmnnnrvwyz",p[0]) != NULL)
-	return 2;  /* voiced obstruents */
-    else
-	return 1;
-}
-
-int cmu_syl_boundary(const cst_item *i,const cst_val *rest)
-{
-    /* Returns TRUE if this should be a syllable boundary */
-    /* This is of course phone set dependent              */
-    int p, n, nn;
-
-    if (rest == NULL)
-	return TRUE;
-    else if (cmu_is_silence(val_string(val_car(rest))))
-	return TRUE;
-    else if (!cmu_has_vowel_in_list(rest)) /* no more vowels so rest *all* coda */
-	return FALSE;
-    else if (!cmu_has_vowel_in_syl(i))  /* need a vowel */
-	return FALSE;
-    else if (cmu_is_vowel(val_string(val_car(rest))))
-	return TRUE;
-    else if (val_cdr(rest) == NULL)
-	return FALSE;
-    else 
-    {   /* so there is following vowel, and multiple phones left */
-	p = cmu_sonority(item_feat_string(i,"name"));
-	n = cmu_sonority(val_string(val_car(rest)));
-	nn = cmu_sonority(val_string(val_car(val_cdr(rest))));
-
-	if ((p <= n) && (n <= nn))
-	    return TRUE;
-	else
-	    return FALSE;
-    }
 }
 
 static int cmulex_dist_to_vowel(const cst_val *rest)
@@ -268,7 +136,7 @@ static int cmulex_onset_bigram(const cst_val *rest)
     char x[10];
     int i;
 
-    cst_sprintf(x,"%s%s",val_string(val_car(rest)),
+    bell_snprintf(x,10,"%s%s",val_string(val_car(rest)),
            val_string(val_car(val_cdr(rest))));
     for (i=0; cmulex_onset_bigrams[i]; i++)
         if (cst_streq(x,cmulex_onset_bigrams[i]))
@@ -281,7 +149,7 @@ static int cmulex_onset_trigram(const cst_val *rest)
     char x[15];
     int i;
 
-    cst_sprintf(x,"%s%s%s",val_string(val_car(rest)),
+    bell_snprintf(x,15,"%s%s%s",val_string(val_car(rest)),
            val_string(val_car(val_cdr(rest))),
            val_string(val_car(val_cdr(val_cdr(rest)))));
     for (i=0; cmulex_onset_trigrams[i]; i++)
@@ -290,7 +158,7 @@ static int cmulex_onset_trigram(const cst_val *rest)
     return FALSE;
 }
 
-int cmu_syl_boundary_mo(const cst_item *i,const cst_val *rest)
+static int cmu_syl_boundary_mo(const cst_item *i,const cst_val *rest)
 {
     /* syl boundary maximal onset */
     int d2v;
@@ -335,12 +203,6 @@ extern const char * const cmu_lts_letter_table[];
 extern const cst_lts_addr cmu_lts_letter_index[];
 extern const cst_lts_model cmu_lts_model[];
 
-cst_lexicon *cmulex_init()
-{
-    /* We actually need the init function match the directory name */
-    return cmu_lex_init();
-}
-
 cst_lexicon *cmu_lex_init()
 {
     /* I'd like to do this as a const but it needs everything in this */
@@ -351,28 +213,22 @@ cst_lexicon *cmu_lex_init()
 
     cmu_lts_rules.name = "cmu";
     cmu_lts_rules.letter_index = cmu_lts_letter_index;
-#ifdef CST_NO_STATIC_LTS_MODEL
-    /* cmu_lts_rules.models will be set elsewhere */
-#else
+
     cmu_lts_rules.models = cmu_lts_model;
-#endif
+
     cmu_lts_rules.phone_table = cmu_lts_phone_table;
     cmu_lts_rules.context_window_size = 4;
     cmu_lts_rules.context_extra_feats = 1;
     cmu_lts_rules.letter_table = 0 /* cmu_lts_letter_table */;
 
     cmu_lex.name = "cmu";
-    cmu_lex.num_entries = cmu_lex_num_entries;
-#ifdef CST_NO_STATIC_LEX
-    /* cmu_lex.data will be set elsewhere */
-#else
+
     /* as the data is const, we cast it through void * */
     cmu_lex.data = (unsigned char *)(void *)cmu_lex_data;
-#endif
+
     cmu_lex.num_bytes = cmu_lex_num_bytes;
     cmu_lex.phone_table = (char **) cmu_lex_phone_table;
     cmu_lex.syl_boundary = cmu_syl_boundary_mo;
-    cmu_lex.addenda = (char ***) addenda;
     cmu_lex.lts_rule_set = (cst_lts_rules *) &cmu_lts_rules;
 
     cmu_lex.phone_hufftable = cmu_lex_phones_huff_table;

@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -39,10 +45,11 @@
 /*  semantics follow them                                                */
 /*************************************************************************/
 
-#include "cst_hrg.h"
 #include "cst_phoneset.h"
 #include "cst_regex.h"
 #include "cst_ffeatures.h"
+#include "bell_ff_sym.h"
+#include "bell_relation_sym.h"
 #include "us_ffeatures.h"
 
 static const cst_val *gpos(const cst_item *word);
@@ -68,12 +75,12 @@ static const cst_val *gpos(const cst_item *word)
 
     for (s=0; us_gpos[s]; s++)
     {
-	for (t=1; us_gpos[s][t]; t++)
-	    if (cst_streq(w,val_string(us_gpos[s][t])))
-		return us_gpos[s][0];
+	for (t=0; us_gpos_words[s][t]; t++)
+	    if (cst_streq(w,us_gpos_words[s][t]))
+		return us_gpos[s];
     }
 
-    return (cst_val *)&val_string_content;
+    return &val_string_content;
 }
 
 static const cst_val *num_digits(const cst_item *token)
@@ -88,9 +95,9 @@ static const cst_val *month_range(const cst_item *token)
     int v = item_feat_int(token,"name");
 
     if ((v > 0) && ( v < 32))
-	return VAL_STRING_1;	
+	return &val_string_1;
     else
-	return VAL_STRING_0;	
+	return &val_string_0;
 }
 
 static const cst_val *token_pos_guess(const cst_item *token)
@@ -159,62 +166,55 @@ static const cst_val *token_pos_guess(const cst_item *token)
     return r;
 }
 
-const cst_val *content_words_in(const cst_item *p)
+static const cst_val *content_words_in(const cst_item *p)
 {
     const cst_item *s;
     int i=0;
-    p=item_as(p,"Word");
-    s=item_as(path_to_item(p,"R:SylStructure.R:Phrase.parent.daughter1"),"Word");
+    p=item_as(p,WORD);
+    s=item_as(path_to_item(p,"R:"SYLSTRUCTURE".R:"PHRASE".P.d1"),WORD);
     for (;s && !item_equal(p,s);s=item_next(s))
     {
-        if (!strcmp(ffeature_string(s,"gpos"),"content"))
+        if (!strcmp(ffeature_string(s,GPOS),"content"))
         {i++;}
     }
-    //	if(!strcmp(ffeature_string(p,"gpos"), "content")){i++;}
+    //	if (!strcmp(ffeature_string(p,GPOS), "content")){i++;}
     return val_string_n(i);
 }
 
-const cst_val *content_words_out(const cst_item *p)
+static const cst_val *content_words_out(const cst_item *p)
 {
     const cst_item *s;
     int i=0;
-    p=item_as(p,"Word");
-    s=item_as(path_to_item(p,"R:SylStructure.R:Phrase.parent.daughtern"),"Word");
-#if 1 /* fix by uratec */
-  for (;s && !item_equal(p,s);s=item_prev(s))
+    p=item_as(p,WORD);
+    s=item_as(path_to_item(p,"R:"SYLSTRUCTURE".R:"PHRASE".P.dn"),WORD);
+
+    /* fix by uratec */
+    for (;s && !item_equal(p,s);s=item_prev(s))
     {
-      if (!strcmp(ffeature_string(s,"gpos"),"content"))
+        if (!strcmp(ffeature_string(s,GPOS),"content"))
         {i++;}
     }
-#else
-    for (;s && !item_equal(p,s);p=item_next(p))
-    {
-        if (!strcmp(ffeature_string(p,"gpos"),"content"))
-        {i++;}
-    }
-    if(!strcmp(ffeature_string(s,"gpos"), "content")){i++;}
-#endif
     return val_string_n(i);
 }
 
-const cst_val *cg_content_words_in_phrase(const cst_item *p)
+static const cst_val *lisp_cg_content_words_in_phrase(const cst_item *p)
 {
-	return float_val(ffeature_float(p,"R:SylStructure.parent.parent.R:Word.content_words_in") + ffeature_float(p,"R:SylStructure.parent.parent.R:Word.content_words_out")) ;//- (strcmp(ffeature_string(p,"R:SylStructure.parent.parent.R:Word.gpos"),"content")==0?1:0));
+	return float_val(ffeature_float(p,"R:"SYLSTRUCTURE".P.P.R:"WORD"."CONTENT_WORDS_IN) + ffeature_float(p,"R:"SYLSTRUCTURE".P.P.R:"WORD"."CONTENT_WORDS_OUT)) ;
 }
 
 
-void us_ff_register(cst_features *ffunctions)
+void us_ff_register(cst_ffunction *ffunctions)
 {
 
     /* The language independent ones */
     basic_ff_register(ffunctions);
 
-    ff_register(ffunctions, "gpos",gpos);
-    ff_register(ffunctions, "num_digits",num_digits);
-    ff_register(ffunctions, "month_range",month_range);
-    ff_register(ffunctions, "token_pos_guess",token_pos_guess);
-    ff_register(ffunctions, "content_words_in",content_words_in);
-    ff_register(ffunctions, "content_words_out",content_words_out);
-    ff_register(ffunctions, "lisp_cg_content_words_in_phrase",cg_content_words_in_phrase);
+    ff_register(ffunctions, GPOS,gpos);
+    ff_register(ffunctions, NUM_DIGITS,num_digits);
+    ff_register(ffunctions, MONTH_RANGE,month_range);
+    ff_register(ffunctions, TOKEN_POS_GUESS,token_pos_guess);
+    ff_register(ffunctions, CONTENT_WORDS_IN,content_words_in);
+    ff_register(ffunctions, CONTENT_WORDS_OUT,content_words_out);
+    ff_register(ffunctions, LISP_CG_CONTENT_WORDS_IN_PHRASE,lisp_cg_content_words_in_phrase);
 
 }

@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -33,50 +39,35 @@
 /*             Author:  Alan W Black (awb@cs.cmu.edu)                    */
 /*               Date:  July 1999                                        */
 /*************************************************************************/
-/*                                                                       */
-/*    Basic wraparounds for malloc and free                              */
-/*                                                                       */
-/*************************************************************************/
+
+
+/*    Basic allocators and matrix allocators                             */
+
 #ifndef __CST_ALLOC_H__
 #define __CST_ALLOC_H__
 
+#include <stdio.h>
+
 #ifndef TRUE
-#define TRUE (1==1)
+#define TRUE 1
 #endif
 #ifndef FALSE
-#define FALSE (1==0)
+#define FALSE 0
 #endif
+
+typedef int bell_boolean;
 
 /* Global allocation (the only kind on Unix) */
 void *cst_safe_alloc(int size);
-void *cst_safe_calloc(int size);
-void *cst_safe_realloc(void *p,int size);
-
-/* Allocate on local heap (needed on WinCE for various reasons) */
-#ifdef UNDER_CE
-#include <windows.h>
-typedef HANDLE cst_alloc_context;
-
-cst_alloc_context new_alloc_context(int size);
-void delete_alloc_context(cst_alloc_context ctx);
-
-void *cst_local_alloc(cst_alloc_context ctx, int size);
-void cst_local_free(cst_alloc_context ctx, void *p);
-#else /* not UNDER_CE */
-typedef void * cst_alloc_context;
-#define new_alloc_context(size)   (NULL)
-#define delete_alloc_context(ctx)
-#define cst_local_alloc(ctx,size) cst_safe_alloc(size)
-#define cst_local_free(cst,p)     cst_free(p)
-#endif /* UNDER_CE */
 
 /* The public interface to the alloc functions */
-
 /* Note the underlying call is calloc, so everything is zero'd */
 #define cst_alloc(TYPE,SIZE) ((TYPE *)cst_safe_alloc(sizeof(TYPE)*(SIZE)))
-#define cst_calloc(TYPE,SIZE) ((TYPE *)cst_safe_calloc(sizeof(TYPE)*(SIZE)))
-#define cst_realloc(P,TYPE,SIZE) ((TYPE *)cst_safe_realloc((void *)(P),sizeof(TYPE)*(SIZE)))
 
 void cst_free(void *p);
+
+/* double matrix allocation and deallocation */
+double **bell_alloc_dmatrix(size_t row, size_t col);
+void bell_free_dmatrix(double **p);
 
 #endif

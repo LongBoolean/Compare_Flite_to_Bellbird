@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -40,18 +46,16 @@
 #ifndef _CST_VOICE_H__
 #define _CST_VOICE_H__
 
-#include "cst_file.h"
 #include "cst_val.h"
 #include "cst_features.h"
 #include "cst_utterance.h"
-#include "cst_relation.h"
 #include "cst_lexicon.h"
 
 struct cst_voice_struct {
     const char *name;
 
     cst_features *features;
-    cst_features *ffunctions;
+    cst_ffunction *ffunctions; // Array for indexed access of features functions
 
     /* This hook is called (from utt_init()) after the input text (if
        any) has been set and voice features have been copied in, but

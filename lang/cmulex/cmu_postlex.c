@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -35,7 +41,9 @@
 /*************************************************************************/
 /*  Moved the CMU lexicon specific postlexical rules into cmulex itself  */
 /*************************************************************************/
-
+#include "cst_phoneset.h"
+#include "bell_ff_sym.h"
+#include "bell_relation_sym.h"
 #include "flite.h"
 
 static void apostrophe_s(cst_utterance *u)
@@ -47,10 +55,10 @@ static void apostrophe_s(cst_utterance *u)
 
     ps = val_phoneset(feat_val(u->features,"phoneset"));
 
-    for (s=item_next(relation_head(utt_relation(u,"Segment"))); 
+    for (s=item_next(relation_head(utt_relation(u,SEGMENT)));
 	 s; s=item_next(s))
     {
-	word = val_string(ffeature(s, "R:SylStructure.parent.parent.name"));
+	word = val_string(ffeature(s, "R:"SYLSTRUCTURE".P.P.name"));
 	if (cst_streq("'s", word))
 	{
 	    pname = item_feat_string(item_prev(s),"name");
@@ -61,7 +69,7 @@ static void apostrophe_s(cst_utterance *u)
 	    {
 		schwa = item_prepend(s,NULL);
 		item_set_string(schwa,"name","ax");
-		item_prepend(item_as(s,"SylStructure"),schwa);
+		item_prepend(item_as(s,SYLSTRUCTURE),schwa);
 	    }
 	    else if (cst_streq("-",phone_feature_string(ps,pname,"cvox")))
 		item_set_string(s,"name","s");
@@ -70,11 +78,11 @@ static void apostrophe_s(cst_utterance *u)
 		 || cst_streq("'ll", word)
 		 || cst_streq("'d", word))
 	{
-	    if (cst_streq("-",ffeature_string(s,"p.ph_vc")))
+	    if (cst_streq("-",ffeature_string(s,"p."PH_VC)))
 	    {
 		schwa = item_prepend(s,NULL);
 		item_set_string(schwa,"name","ax");
-		item_prepend(item_as(s,"SylStructure"),schwa);
+		item_prepend(item_as(s,SYLSTRUCTURE),schwa);
 	    }
 	}
     }
@@ -86,13 +94,13 @@ static void the_iy_ax(cst_utterance *u)
     const cst_item *i;
     const char *word;
 
-    for (i = relation_head(utt_relation(u, "Segment")); i; i = item_next(i))
+    for (i = relation_head(utt_relation(u, SEGMENT)); i; i = item_next(i))
     {
-	if (cst_streq("ax", item_name(i)))
+	if (cst_streq("ax", ITEM_NAME(i)))
 	{
-	    word = ffeature_string(i,"R:SylStructure.parent.parent.name");
+	    word = ffeature_string(i,"R:"SYLSTRUCTURE".P.P.name");
 	    if (cst_streq("the", word)
-		&& cst_streq("+", ffeature_string(i,"n.ph_vc")))
+		&& cst_streq("+", ffeature_string(i,"n."PH_VC)))
 		    item_set_string(i, "name", "iy");
 	}
 

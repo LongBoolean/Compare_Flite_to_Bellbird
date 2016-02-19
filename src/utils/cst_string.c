@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -40,43 +46,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
+#include <errno.h>
 #include "cst_alloc.h"
 #include "cst_string.h"
-#include "cst_file.h"
-
-#ifdef UNDER_CE /* WinCE does not fully implement ANSI C */
-
-cst_string *cst_strrchr(const cst_string *str, int c)
-{
-    cst_string *p = (const cst_string *)str + cst_strlen(str);
-    while (p >= str) {
-	if (*p == c)
-	    return p;
-	--p;
-    }
-    return NULL;
-}
 
 double cst_atof(const char *str)
 {
-    /* double f = 0.0; */
-    
-    /* sscanf(str, "%f", &f); */
+// Bare atof where no validation is performed. See bell_validate_atof for atof with checks
     return atof(str);
 }
-
-#else /* Sane operating system */
-
-cst_string *cst_strrchr(const cst_string *str, int c)
-{
-    return (cst_string *)strrchr((const char *)str, c);
-}
-
-double cst_atof(const char *str)
-{
-    return atof(str);
-}
-#endif /* WinCE */
 
 cst_string *cst_strdup(const cst_string *str)
 {
@@ -90,11 +69,6 @@ cst_string *cst_strdup(const cst_string *str)
     return nstr;
 }
 
-cst_string *cst_strchr(const cst_string *s, int c)
-{
-    return (cst_string *)strchr((const char *)s,c);
-}
-
 char *cst_substr(const char *str,int start, int length)
 {
     char *nstr = NULL;
@@ -106,19 +80,6 @@ char *cst_substr(const char *str,int start, int length)
 	nstr[length] = '\0';
     }
     return nstr;
-}
-
-char *cst_string_before(const char *s,const char *c)
-{
-    char *p;
-    char *q;
-
-    p = (char *)cst_strstr(s,c);
-    if (p == NULL) 
-	return NULL;
-    q = (char *)cst_strdup((cst_string *)s);
-    q[cst_strlen(s)-cst_strlen(p)] = '\0';
-    return q;
 }
 
 cst_string *cst_downcase(const cst_string *str)
@@ -160,20 +121,44 @@ int cst_member_string(const char *str, const char * const *slist)
     return *p != NULL;
 }
 
-char *cst_strcat(const char *a, const char *b)
+int bell_validate_atof(const char * str, float * floatout)
 {
-    char *r;
+// A safer atof checking for some types of errors
+    char *end;
 
-    r = cst_alloc(char,cst_strlen(a)+cst_strlen(b)+1);
-    cst_sprintf(r,"%s%s",a,b);
-    return r;
+    errno = 0;
+    *floatout=strtof(str, &end);
+
+    if (end==str || ERANGE==errno)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
-char *cst_strcat3(const char *a, const char *b, const char *c)
+int bell_validate_atoi(const char * str, int * intout)
 {
-    char *r;
+// A safer atoi checking for some types of errors
+    char *end;
 
-    r = cst_alloc(char,cst_strlen(a)+cst_strlen(b)+cst_strlen(c)+1);
-    cst_sprintf(r,"%s%s%s",a,b,c);
-    return r;
+    errno = 0;
+    const long sl = strtol(str,&end,10);
+
+    if (end==str || ERANGE==errno)
+    {
+        if (intout != NULL) *intout = 0;
+        return FALSE;
+    }
+    else if (sl>INT_MAX || sl<INT_MIN)
+    {
+        if (intout != NULL) *intout = 0;
+        return FALSE;
+    }
+
+    if(intout != NULL)
+    {
+        *intout=(int) sl;
+    }
+    return TRUE;
 }

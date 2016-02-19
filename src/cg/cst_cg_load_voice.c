@@ -1,8 +1,14 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
-/*                       Copyright (c) 2010-2013                         */
+/*                       Copyright (c) 2010-2011                         */
 /*                        All Rights Reserved.                           */
 /*                                                                       */
 /*  Permission is hereby granted, free of charge, to use and distribute  */
@@ -39,8 +45,11 @@
 /*************************************************************************/
 
 #include "flite.h"
+#include "cst_error.h"
+#include "cst_features.h"
 #include "cst_cg.h"
 #include "cst_cg_map.h"
+#include "bell_file.h"
 
 cst_voice *cst_cg_load_voice(const char *filename,
                              const cst_lang *lang_table)
@@ -54,19 +63,21 @@ cst_voice *cst_cg_load_voice(const char *filename,
     char* fname;
     char* fval;
     cst_file vd;
+    int num_param_models = 3;
+    int num_dur_models = 1;
+    int tempint;
 
-    vd = cst_fopen(filename,CST_OPEN_READ);
-    if (vd == NULL)
+    if ((vd = bell_fopen(filename,"rb")) == NULL)
     {
-        cst_errmsg("Error load voice: can't open file %s\n",filename);
-	return NULL;
+        cst_errmsg("Unable to open clustergen voice: \"%s\" \n",filename);
+	cst_error();
     }
 
     if (cst_cg_read_header(vd) != 0)
     {
-        cst_errmsg("Error load voice: %s does not have expected header\n",filename);
-        cst_fclose(vd);
-        return NULL;
+        bell_fclose(vd);
+        cst_errmsg("Clustergen voice: \"%s\", appears to have the wrong format \n",filename);
+	cst_error();
     }
 
     vox = new_voice();
@@ -82,24 +93,38 @@ cst_voice *cst_cg_load_voice(const char *filename,
             end_of_features = 1;
         else
         {
-            xname = feat_own_string(vox->features,fname);
-            flite_feat_set_string(vox->features,xname, fval);
+// Only set features bellbird actually uses at this time
+            if (cst_streq(fname,"language"))
+            {
+                xname = feat_own_string(vox->features,fname);
+                feat_set_string(vox->features,xname, fval);
+            }
+            else if (cst_streq(fname,"num_param_models"))
+            {
+                bell_validate_atoi(fval,&tempint);
+                num_param_models=tempint;
+            }
+            else if (cst_streq(fname,"num_dur_models"))
+            {
+                bell_validate_atoi(fval,&tempint);
+                num_dur_models=tempint;
+            }
         }
         cst_free(fname);
         cst_free(fval);
     }
 
     /* Load up cg_db from external file */
-    cg_db = cst_cg_load_db(vox,vd);
+    cg_db = cst_cg_load_db(vd,num_param_models,num_dur_models);
 
     if (cg_db == NULL)
     {
-	cst_fclose(vd);
+	bell_fclose(vd);
         return NULL;
     }
 
     /* Use the language feature to initialize the correct voice */
-    language = flite_get_param_string(vox->features, "language", "");
+    language = get_param_string(vox->features, "language", "");
 
     /* Search Lang table for lang_init() and lex_init(); */
     for (i=0; lang_table[i].lang; i++)
@@ -114,36 +139,24 @@ cst_voice *cst_cg_load_voice(const char *filename,
     if (lex == NULL)
     {   /* Language is not supported */
 	/* Delete allocated memory in cg_db */
-	cst_cg_free_db(vd,cg_db);
-	cst_fclose(vd);
-        cst_errmsg("Error load voice: lang/lex %s not supported in this binary\n",language);
+	cst_cg_free_db(cg_db);
+	bell_fclose(vd);
 	return NULL;	
     }
     
     /* Things that weren't filled in already. */
     vox->name = cg_db->name;
-    flite_feat_set_string(vox->features,"name",cg_db->name);
-    flite_feat_set_string(vox->features,"pathname",filename);
+    feat_set_string(vox->features,"name",cg_db->name);
     
-    flite_feat_set(vox->features,"lexicon",lexicon_val(lex));
-    flite_feat_set(vox->features,"postlex_func",uttfunc_val(lex->postlex));
-
-    /* No standard segment durations are needed as its done at the */
-    /* HMM state level */
-    flite_feat_set_string(vox->features,"no_segment_duration_model","1");
-    flite_feat_set_string(vox->features,"no_f0_target_model","1");
+    feat_set(vox->features,"lexicon",lexicon_val(lex));
+    feat_set(vox->features,"postlex_func",uttfunc_val(lex->postlex));
 
     /* Waveform synthesis */
-    flite_feat_set(vox->features,"wave_synth_func",uttfunc_val(&cg_synth));
-    flite_feat_set(vox->features,"cg_db",cg_db_val(cg_db));
-    flite_feat_set_int(vox->features,"sample_rate",cg_db->sample_rate);
+    feat_set(vox->features,"wave_synth_func",uttfunc_val(&cg_synth));
+    feat_set(vox->features,"cg_db",cg_db_val(cg_db));
+    feat_set_int(vox->features,"sample_rate",cg_db->sample_rate);
 
-    cst_fclose(vd);
+    bell_fclose(vd);
+
     return vox;
 }
-
-void cst_cg_unload_voice(cst_voice *vox,cst_val *voice_list)
-{
-    delete_voice(vox);
-}
-

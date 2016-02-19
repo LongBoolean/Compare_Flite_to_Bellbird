@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -40,20 +46,12 @@
 #ifndef _CST_CART_H__
 #define _CST_CART_H__
 
-#include "cst_file.h"
 #include "cst_val.h"
-#include "cst_features.h"
 #include "cst_item.h"
-#include "cst_relation.h"
 
 #define CST_CART_OP_NONE    255
-#define CST_CART_OP_LEAF    255
 #define CST_CART_OP_IS      0
-#define CST_CART_OP_IN      1
 #define CST_CART_OP_LESS    2
-#define CST_CART_OP_GREATER 3
-#define CST_CART_OP_MATCHES 4
-#define CST_CART_OP_EQUALS  5
 
 typedef struct cst_cart_node_struct {
     unsigned char feat;

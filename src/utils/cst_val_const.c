@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -62,11 +68,6 @@ DEF_CONST_VAL_STRING(val_string_16,"16");
 DEF_CONST_VAL_STRING(val_string_17,"17");
 DEF_CONST_VAL_STRING(val_string_18,"18");
 DEF_CONST_VAL_STRING(val_string_19,"19");
-DEF_CONST_VAL_STRING(val_string_20,"20");
-DEF_CONST_VAL_STRING(val_string_21,"21");
-DEF_CONST_VAL_STRING(val_string_22,"22");
-DEF_CONST_VAL_STRING(val_string_23,"23");
-DEF_CONST_VAL_STRING(val_string_24,"24");
 
 DEF_CONST_VAL_INT(val_int_0,0);
 DEF_CONST_VAL_INT(val_int_1,1);
@@ -88,66 +89,51 @@ DEF_CONST_VAL_INT(val_int_16,16);
 DEF_CONST_VAL_INT(val_int_17,17);
 DEF_CONST_VAL_INT(val_int_18,18);
 DEF_CONST_VAL_INT(val_int_19,19);
-DEF_CONST_VAL_INT(val_int_20,20);
-DEF_CONST_VAL_INT(val_int_21,21);
-DEF_CONST_VAL_INT(val_int_22,22);
-DEF_CONST_VAL_INT(val_int_23,23);
-DEF_CONST_VAL_INT(val_int_24,24);
 
-static const int val_int_const_max = 25;
+static const int val_int_const_max = 20;
 static const cst_val * const val_int_const [] = {
-    VAL_INT_0,
-    VAL_INT_1,
-    VAL_INT_2,
-    VAL_INT_3,
-    VAL_INT_4,
-    VAL_INT_5,
-    VAL_INT_6,
-    VAL_INT_7,
-    VAL_INT_8,
-    VAL_INT_9,
-    VAL_INT_10,
-    VAL_INT_11,
-    VAL_INT_12,
-    VAL_INT_13,
-    VAL_INT_14,
-    VAL_INT_15,
-    VAL_INT_16,
-    VAL_INT_17,
-    VAL_INT_18,
-    VAL_INT_19,
-    VAL_INT_20,
-    VAL_INT_21,
-    VAL_INT_22,
-    VAL_INT_23,
-    VAL_INT_24};
+    &val_int_0,
+    &val_int_1,
+    &val_int_2,
+    &val_int_3,
+    &val_int_4,
+    &val_int_5,
+    &val_int_6,
+    &val_int_7,
+    &val_int_8,
+    &val_int_9,
+    &val_int_10,
+    &val_int_11,
+    &val_int_12,
+    &val_int_13,
+    &val_int_14,
+    &val_int_15,
+    &val_int_16,
+    &val_int_17,
+    &val_int_18,
+    &val_int_19 };
 
 static const cst_val * const val_string_const [] = {
-    VAL_STRING_0,
-    VAL_STRING_1,
-    VAL_STRING_2,
-    VAL_STRING_3,
-    VAL_STRING_4,
-    VAL_STRING_5,
-    VAL_STRING_6,
-    VAL_STRING_7,
-    VAL_STRING_8,
-    VAL_STRING_9,
-    VAL_STRING_10,
-    VAL_STRING_11,
-    VAL_STRING_12,
-    VAL_STRING_13,
-    VAL_STRING_14,
-    VAL_STRING_15,
-    VAL_STRING_16,
-    VAL_STRING_17,
-    VAL_STRING_18,
-    VAL_STRING_19,
-    VAL_STRING_20,
-    VAL_STRING_21,
-    VAL_STRING_22,
-    VAL_STRING_23,
-    VAL_STRING_24};
+    &val_string_0,
+    &val_string_1,
+    &val_string_2,
+    &val_string_3,
+    &val_string_4,
+    &val_string_5,
+    &val_string_6,
+    &val_string_7,
+    &val_string_8,
+    &val_string_9,
+    &val_string_10,
+    &val_string_11,
+    &val_string_12,
+    &val_string_13,
+    &val_string_14,
+    &val_string_15,
+    &val_string_16,
+    &val_string_17,
+    &val_string_18,
+    &val_string_19 };
   
 const cst_val *val_int_n(int n)
 {
@@ -168,26 +154,3 @@ const cst_val *val_string_n(int n)
     else
 	return val_string_const[val_int_const_max-1];
 }
-
-#if 0
-/* This technique isn't thread safe, so I replaced it with val_consts */
-static cst_features *val_string_consts = NULL;
-
-const cst_val *val_string_x(const char *n)
-{
-    const cst_val *v;
-
-    /* *BUG* This will have to be fixed soon */
-    if (val_string_consts == NULL)
-	val_string_consts = new_features();
-    
-    v = feat_val(val_string_consts,n);
-    if (v)
-	return v;
-    else
-    {
-	feat_set_string(val_string_consts,n,n);
-	return feat_val(val_string_consts,n);
-    }
-}
-#endif

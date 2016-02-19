@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -48,9 +54,6 @@ typedef unsigned char  cst_lts_feat;
 typedef unsigned char  cst_lts_letter;
 typedef unsigned char  cst_lts_model;
 
-/* end of rule value */
-#define CST_LTS_EOR 255
-
 typedef struct cst_lts_rules_struct {
     char *name;
     const cst_lts_addr *letter_index;  /* index into model first state */
@@ -69,10 +72,7 @@ typedef struct cst_lts_rule_struct {
     cst_lts_addr   qfalse;
 } cst_lts_rule;
 
-cst_lts_rules *new_lts_rules();
-
 cst_val *lts_apply(const char *word,const char *feats,const cst_lts_rules *r);
-cst_val *lts_apply_val(const cst_val *wlist,const char *feats,const cst_lts_rules *r);
 
 #endif
 

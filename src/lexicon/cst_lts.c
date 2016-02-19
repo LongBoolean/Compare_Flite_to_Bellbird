@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -41,56 +47,14 @@
 #include "cst_features.h"
 #include "cst_lts.h"
 #include "cst_endian.h"
+#include "bell_file.h"
+
+/* end of rule value */
+#define CST_LTS_EOR 255
 
 static cst_lts_phone apply_model(cst_lts_letter *vals,
 				 cst_lts_addr start,
 				 const cst_lts_model *model);
-
-cst_lts_rules *new_lts_rules()
-{
-    cst_lts_rules *lt = cst_alloc(cst_lts_rules,1);
-    lt->name = 0;
-    lt->letter_index = 0;
-    lt->models = 0;
-    lt->phone_table = 0;
-    lt->context_window_size = 0;
-    lt->context_extra_feats = 0;
-    lt->letter_table = 0;
-    return lt;
-}
-
-cst_val *lts_apply_val(const cst_val *wlist,const char *feats,const cst_lts_rules *r)
-{
-    /* for symbol to symbol mapping */
-    const cst_val *v;
-    cst_val *p;
-    char *word;
-    int i,j;
-
-    word = cst_alloc(char,val_length(wlist)+1);
-
-    for (v=wlist,i=0; v; v=val_cdr(v),i++)
-    {
-	for (j=0; r->letter_table[j]; j++)
-	    if (cst_streq(val_string(val_car(v)),r->letter_table[j]))
-	    {
-		word[i] = j;
-		break;
-	    }
-        if (!r->letter_table[j])
-        {
-#if 0
-            printf("awb_debug unknown letter >%s<\n",val_string(val_car(v)));
-#endif
-            i--;  /* can't find this letter so skip it */
-        }
-    }
-
-    p = lts_apply(word,feats,r);
-    cst_free(word);
-
-    return p;
-}
 
 cst_val *lts_apply(const char *word,const char *feats,const cst_lts_rules *r)
 {
@@ -102,19 +66,20 @@ cst_val *lts_apply(const char *word,const char *feats,const cst_lts_rules *r)
     char *left, *right, *p;
     char hash;
     char zeros[8];
+    size_t full_bufflen;
     
     /* For feature vals for each letter */
     fval_buff = cst_alloc(cst_lts_letter,
 			  (r->context_window_size*2)+
 			   r->context_extra_feats);
     /* Buffer with added contexts */
+    full_bufflen = (r->context_window_size*2)+cst_strlen(word)+1;
     full_buff = cst_alloc(cst_lts_letter,
-			  (r->context_window_size*2)+
-			  cst_strlen(word)+1); /* TBD assumes single POS feat */
+			  full_bufflen); /* TBD assumes single POS feat */
     if (r->letter_table)
     {
 	for (i=0; i<8; i++) zeros[i] = 2;
-	cst_sprintf((char *)full_buff,
+	bell_snprintf((char *)full_buff, full_bufflen,
                     "%.*s%c%s%c%.*s",
 		    r->context_window_size-1, zeros,
 		    1,
@@ -126,7 +91,7 @@ cst_val *lts_apply(const char *word,const char *feats,const cst_lts_rules *r)
     else
     {
 	/* Assumes l_letter is a char and context < 8 */
-	cst_sprintf((char *)full_buff,
+	bell_snprintf((char *)full_buff, full_bufflen,
                     "%.*s#%s#%.*s",
 		    r->context_window_size-1, "00000000",
 		    word,
@@ -140,7 +105,7 @@ cst_val *lts_apply(const char *word,const char *feats,const cst_lts_rules *r)
 	 pos--)
     {
 	/* Fill the features buffer for the predictor */
-	cst_sprintf((char *)fval_buff,
+	bell_snprintf((char *)fval_buff, full_bufflen,
                     "%.*s%.*s%s",
 		    r->context_window_size,
 		    full_buff+pos-r->context_window_size,
@@ -213,15 +178,15 @@ static cst_lts_phone apply_model(cst_lts_letter *vals,cst_lts_addr start,
 	 state.feat != CST_LTS_EOR;
 	)
     {
-	/* printf("awb_debug %s %c %c %d\n",vals,vals[state.feat],state.val, 
+      /* printf("awb_debug %s %c %c %d\n",vals,vals[state.feat],state.val,
            (vals[state.feat] == state.val) ? 1 : 0);  */
 	if (vals[state.feat] == state.val)
 	    nstate = state.qtrue;
 	else
 	    nstate = state.qfalse;
-	/* This should really happen at compilation time */
-	if (CST_BIG_ENDIAN)
-	    nstate = SWAPSHORT(nstate);
+#ifdef WORDS_BIGENDIAN
+	nstate = SWAPSHORT(nstate);
+#endif
 
 	cst_lts_get_state(&state,model,nstate,sizeof_cst_lts_rule);
     }

@@ -42,6 +42,7 @@
 
 #include <ctype.h>
 #include "us_text.h"
+#include "cst_error.h"
 
 static const char * const digit2num[] = {
     "zero",
@@ -203,10 +204,12 @@ cst_val *en_exp_ordinal(const char *rawnumstring)
     const char *l;
     const char *ord;
     char *numstring;
-    int i,j;
+    size_t i,j;
+    size_t rawnumstringlen;
 
     numstring = cst_strdup(rawnumstring);
-    for (j=i=0; i < cst_strlen(rawnumstring); i++)
+    rawnumstringlen = cst_strlen(rawnumstring);
+    for (j=i=0; i < rawnumstringlen; i++)
 	if (rawnumstring[i] != ',')
 	{
 	    numstring[j] = rawnumstring[i];
@@ -302,14 +305,18 @@ cst_val *en_exp_real(const char *numstring)
     char *aaa, *p;
     cst_val *r;
 
-    if (numstring && (numstring[0] == '-'))
+    if (numstring == NULL)
+    {
+        r = NULL;
+    }
+    else if (numstring[0] == '-')
 	r = cons_val(string_val("minus"),
 		     en_exp_real(&numstring[1]));
-    else if (numstring && (numstring[0] == '+'))
+    else if (numstring[0] == '+')
 	r = cons_val(string_val("plus"),
 		     en_exp_real(&numstring[1]));
-    else if (((p=strchr(numstring,'e')) != 0) ||
-	     ((p=strchr(numstring,'E')) != 0))
+    else if ( ((p=strchr(numstring,'e')) != 0) ||
+	     ((p=strchr(numstring,'E')) != 0) ) 
     {
 	aaa = cst_strdup(numstring);
 	aaa[cst_strlen(numstring)-cst_strlen(p)] = '\0';
@@ -328,7 +335,7 @@ cst_val *en_exp_real(const char *numstring)
 	cst_free(aaa);
     }
     else
-	r = en_exp_number(numstring);  /* I don't think you can get here */
+	r = en_exp_number(numstring);
 
     return r;
 }

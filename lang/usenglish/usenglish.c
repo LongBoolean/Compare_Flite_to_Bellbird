@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -38,9 +44,10 @@
 
 #include "flite.h"
 #include "usenglish.h"
-#include "us_f0.h"
 #include "us_text.h"
 #include "us_ffeatures.h"
+#include "us_ffeatures_hts.h"
+#include "cst_string.h"
 
 static const char * const us_english_punctuation = "\"'`.,:;!?(){}[]";
 static const char * const us_english_prepunctuation = "\"'`({[";
@@ -76,12 +83,17 @@ void usenglish_init(cst_voice *v)
     feat_set(v->features,"int_cart_accents",cart_val(&us_int_accent_cart));
     feat_set(v->features,"int_cart_tones",cart_val(&us_int_tone_cart));
 
-    /* Duration */
-    feat_set(v->features,"dur_cart",cart_val(&us_durz_cart));
-    feat_set(v->features,"dur_stats",dur_stats_val((dur_stats *)us_dur_stats));
+    if (v->name && cst_streq(v->name,"hts"))
+    {
+      feat_set(v->features,"phrasing_func",uttfunc_val(&hts_phrasing));
 
-    /* f0 model */
-    feat_set(v->features,"f0_model_func",uttfunc_val(&us_f0_model));
+      /* Add ffunctions which are needed by hts voices */
+      us_ff_register_hts(v->ffunctions);
+    }
+    else
+    {
+      feat_set(v->features,"phrasing_func",uttfunc_val(&default_phrasing));
 
-    us_ff_register(v->ffunctions);
+      us_ff_register(v->ffunctions);
+    }
 }

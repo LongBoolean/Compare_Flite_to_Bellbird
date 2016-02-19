@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -39,10 +45,12 @@
 /*************************************************************************/
 
 #include <ctype.h>
+#include "cst_regex.h"
+#include "cst_utt_utils.h"
 #include "flite.h"
+#include "bell_file.h"
 #include "usenglish.h"
 #include "us_text.h"
-#include "cst_regex.h"
 
 static int text_splitable(const char *s,int i);
 static cst_val *state_name(const char *name,cst_item *t);
@@ -175,14 +183,6 @@ static int section_like(const cst_item *t)
     return v;
 }
 
-cst_utterance *us_textanalysis(cst_utterance *u)
-{
-    if (!feat_present(u->features, "tokentowords_func"))
-	utt_set_feat(u, "tokentowords_func", itemfunc_val(us_tokentowords));
-
-    return default_textanalysis(u);
-}
-
 static cst_val *us_tokentowords_one(cst_item *token, const char *name);
 cst_val *us_tokentowords(cst_item *token)
 {
@@ -209,58 +209,19 @@ static cst_val *add_break(cst_val *l)
     return l;
 }
 
-static int contains_unicode_single_quote(const char *name)
-{
-    static const char *unicode_single_quote = "’";
-    int i;
-
-    for (i=0; name[i]; i++)
-    {
-        /* No check if name is long enough as it'll have NULL before end */
-        if ((name[i] == unicode_single_quote[0]) &&
-            (name[i+1] == unicode_single_quote[1]) &&
-            (name[i+2] == unicode_single_quote[2]))
-            return TRUE;
-    }
-    return FALSE;
-}
-
-static char *map_unicode_single_quote(const char *name)
-{
-    static const char *unicode_single_quote = "’";
-    int i,j;
-    char *aaa = cst_strdup(name);  /* it'll always get shorter */
-
-    for (i=0,j=0; name[i]; i++,j++)
-    {
-        if ((name[i] == unicode_single_quote[0]) &&
-            (name[i+1] == unicode_single_quote[1]) &&
-            (name[i+2] == unicode_single_quote[2]))
-        {
-            aaa[j] = '\'';
-            i+=2;
-        }
-        else
-            aaa[j] = name[i];
-    }
-    aaa[j] = '\0';
-
-    return aaa;
-}
-
 static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 {
     /* Return list of words that expand token/name */
     char *p, *aaa, *bbb, *ccc;
-    int i,j,k,l;
+    int i,j;
+    size_t k,l,m;
     cst_val *r, *s, *ss;
     const cst_val *rr;
     const char *nsw = "";
-    const char *ssml_alias = "";
-    const char *token_name = "";
     cst_lexicon *lex;
     cst_utterance *utt;
-    /* printf("token_name %s name %s\n",item_name(token),name); */
+    int is_in_lex;
+    /* printf("token_name %s name %s\n",ITEM_NAME(token),name); */
     /* FIXME: For SAPI and friends, any tokens with explicit
        pronunciations need to be passed through as-is.  This should be
        done in the interface code rather than here once the
@@ -272,23 +233,6 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
     if (item_feat_present(token,"nsw"))
 	nsw = item_feat_string(token,"nsw");
 
-    token_name = item_name(token);
-
-    if ((item_feat_present(token,"ssml_alias")) &&
-        (!cst_streq(token_name,name)))  /* and we are not recursing */
-    {
-        /* SSML has given a substitute for this (and more) tokens */
-        /* NOTE: the alias is not put through text normalization */
-        ssml_alias = item_feat_string(token,"ssml_alias");
-        if (cst_streq(ssml_alias,ffeature_string(token,"p.ssml_alias")))
-            /* The first token gets the substitution */
-            return NULL;
-        else
-        {
-            return cons_val(string_val(ssml_alias),NULL);
-        }
-    }
-
     utt = item_utt(token);
     lex = val_lexicon(feat_val(utt->features,"lexicon"));
 
@@ -296,7 +240,7 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
         r = NULL;
     else if ((cst_streq("a",name) || cst_streq("A",name)) &&
         ((item_next(token) == 0) ||
-         (!cst_streq(name,item_name(token))) ||
+         (!cst_streq(name,ITEM_NAME(token))) ||
          (!cst_streq("",ffeature_string(token,"punc")))))
     {   /* if A is a sub part of a token, then its ey not ah */
 	r = cons_val(string_val("_a"),0);
@@ -319,13 +263,14 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
     else if (cst_regex_match(cst_rx_commaint,name))
     {   /* 99,999,999 */
 	aaa = cst_strdup(name);
-	for (j=i=0; i < cst_strlen(name); i++)
-	    if (name[i] != ',')
+        m = cst_strlen(name);
+	for (l=k=0; k < m; k++)
+	    if (name[k] != ',')
 	    {
-		aaa[j] = name[i];
-		j++;
+		aaa[l] = name[k];
+		l++;
 	    }
-	aaa[j] = '\0';
+	aaa[l] = '\0';
 	r = en_exp_real(aaa);
 	cst_free(aaa);
     }
@@ -409,8 +354,8 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 	}
         ss = cons_val(string_val(aaa),ss);
         if ((val_length(ss) == 2) &&
-            (atoi(val_string(val_car(val_cdr(ss)))) <
-             atoi(val_string(val_car(ss)))))  /* its a number range */
+            (strtol(val_string(val_car(val_cdr(ss))),NULL,10) <
+             strtol(val_string(val_car(ss)),NULL,10)))  /* its a number range */
         {
             /* Should get 22-23 November, or 1998-1999 right */
             r = 
@@ -466,7 +411,7 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 	if (cst_streq("",ffeature_string(token,"p.punc")))
 	{   /* no preceeding punc */
 	    char n[10];
-	    cst_sprintf(n,"%d",en_exp_roman(name));
+	    bell_snprintf(n,10,"%d",en_exp_roman(name));
 	    if (rex_like(token))
 		r = cons_val(string_val("the"),
 			     en_exp_ordinal(n));
@@ -555,7 +500,7 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
     }
     else if (cst_streq(name,"am") || cst_streq(name,"AM"))
     {
-        if (!cst_streq(name,item_name(token)))
+        if (!cst_streq(name,ITEM_NAME(token)))
             r = en_exp_letters(name);
         else if (item_prev(token) &&
                  (cst_regex_match(numbertime,ffeature_string(token,"p.name")) ||
@@ -670,20 +615,25 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 		       cons_val(string_val("'s"),0));
 	cst_free(aaa);
     }
-    else if (contains_unicode_single_quote(name))
+    else if ((p=strrchr(name,'\''))
+            || ( (p=strrchr(name,'\xe2'))
+                  && *(p+1)!='\0' && *(p+1)=='\x80'
+                  && *(p+2)!='\0' && *(p+2)=='\x99' )
+            )  /* test for ASCII apostrophe or UTF-8 directional apostrophe hex e28099 */
+               /* note: latter test exploits short-circuiting of && operator           */
     {
-        /* A single quote is sometimes rendered as unicode "’" */
-        /* so we map it back to an ascii single quote ' */
-        aaa = map_unicode_single_quote(name);
-        r = us_tokentowords_one(token, aaa);
-        cst_free(aaa);
-        return r;
-    }
-    else if ((p=(cst_strrchr(name,'\''))))
-    {
-	static const char * const pc[] = { "'s", "'ll", "'ve", "'d", NULL };
+	static const char *pc[] = { "'s", "'ll", "'ve", "'d", NULL };
 
-	bbb = cst_downcase(p);
+        if (p[0]=='\xe2')
+        {
+            ccc = p+2;
+            ccc[0]='\''; /* Remap UTF-8 directional apostrophe for common logic */
+        }
+        else
+        {
+            ccc = p;
+        }
+	bbb = cst_downcase(ccc);
 	if (cst_member_string(bbb, pc))
 	{
 	    aaa = cst_strdup(name);
@@ -703,14 +653,23 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 	else
 	{
 	    aaa = cst_strdup(name);
-	    strcpy(&aaa[cst_strlen(name)-cst_strlen(p)],p+1);
+            /* remove apostrophe from aaa*/
+            ccc++;
+            k = cst_strlen(name)-cst_strlen(p);
+            l = 0;
+            while(ccc[l] != '\0')
+            {
+                aaa[k+l] = ccc[l];
+                l++;
+            }
+            aaa[k+l] = '\0';
 	    r = us_tokentowords_one(token,aaa);
 	    cst_free(aaa);
 	}
 	cst_free(bbb);
     }
     else if ((cst_regex_match(digitsslashdigits,name)) &&
-	     (cst_streq(name,item_name(token))))
+	     (cst_streq(name,ITEM_NAME(token))))
     {   /* might be fraction, or not */
 	p=strchr(name,'/');
 	aaa = cst_strdup(name);
@@ -719,11 +678,11 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 	if ((cst_streq("1",aaa)) && (cst_streq("2",bbb)))
 	    r = cons_val(string_val("a"),
 			 cons_val(string_val("half"),0));
-	else if (atoi(aaa) < (atoi(bbb)))
+	else if (strtol(aaa,NULL,10) < (strtol(bbb,NULL,10)))
 	{
 	    r = val_append(en_exp_number(aaa),
 			   en_exp_ordinal(bbb));
-	    if (atoi(aaa) > 1)
+	    if (strtol(aaa,NULL,10) > 1)
 		r = val_append(r,cons_val(string_val("'s"),0));
 	}
 	else
@@ -763,7 +722,7 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
     else if (cst_regex_match(wandm,name))
     {   /* weights and measures */
         for (j=cst_strlen(name)-1; j > 0; j--)
-            if (cst_strchr("0123456789",name[j]))
+            if (strchr("0123456789",name[j]))
                 break;
         j += 1;
         for (i=0; wandm_abbrevs[i][0]; i++)
@@ -787,41 +746,46 @@ static cst_val *us_tokentowords_one(cst_item *token, const char *name)
 
         cst_free(aaa);
     }
-    else if ((cst_strlen(name) > 1) && (!cst_regex_match(cst_rx_alpha,name)))
-    {   /* its not just alphas */
-	for (i=0; name[i] != '\0'; i++)
-	    if (text_splitable(name,i))
-		break;
-	aaa = cst_strdup(name);
-	aaa[i+1] = '\0';
-	bbb = cst_strdup(&name[i+1]);
-	item_set_string(token,"nsw","nide");
-	r = val_append(us_tokentowords_one(token,aaa),
-		       us_tokentowords_one(token,bbb));
-	cst_free(aaa);
-	cst_free(bbb);
-    }
-    else if ((s = state_name(name,token)))
+    else
     {
-	r = s;
-    }
-    else if ((cst_strlen(name) > 1) && 
-	     (cst_regex_match(cst_rx_alpha,name)) &&
-             (!in_lex(lex,name,NULL,NULL)) &&  // AUP: Added 4th argument (voice feats) as NULL, needs to be revisited later.
-	     (!us_aswd(name)))
-        /* Still not quiet right, if there is a user_lex we need to check */
-        /* it too -- but user_lex isn't user setable yet */
-	/* Need common exception list */
-	/* unpronouncable list of alphas */
-	r = en_exp_letters(name);
+        ccc = cst_downcase(name);
+        is_in_lex = in_lex(lex,ccc,NULL);
+        if ((cst_strlen(name) > 1) && (!cst_regex_match(cst_rx_alpha,name))
+                  && (!is_in_lex) )
+        {   /* its not just alphas */
+            for (i=0; name[i] != '\0'; i++)
+	        if (text_splitable(name,i))
+		    break;
+	    aaa = cst_strdup(name);
+	    aaa[i+1] = '\0';
+	    bbb = cst_strdup(&name[i+1]);
+	    item_set_string(token,"nsw","nide");
+	    r = val_append(us_tokentowords_one(token,aaa),
+		           us_tokentowords_one(token,bbb));
+	    cst_free(aaa);
+	    cst_free(bbb);
+        }
+        else if ((s = state_name(name,token)))
+        {
+	    r = s;
+        }
+        else if ((cst_strlen(name) > 1) &&
+	         (cst_regex_match(cst_rx_alpha,name)) &&
+                 (!is_in_lex) &&
+	         (!us_aswd(name)))
+            /* Still not quiet right, if there is a user_lex we need to check */
+            /* it too -- but user_lex isn't user setable yet */
+	    /* Need common exception list */
+	    /* unpronouncable list of alphas */
+	    r = en_exp_letters(name);
 
-    /* buckets of other stuff missing */
+        /* buckets of other stuff missing */
 
-    else  /* just a word */
-    {
-	aaa = cst_downcase(name);
-	r = cons_val(string_val(aaa),0);
-	cst_free(aaa);
+        else  /* just a word */
+        {
+            r = cons_val(string_val(ccc),0);
+        }
+        cst_free(ccc);
     }
     return r;
 }
@@ -984,6 +948,3 @@ static cst_val *state_name(const char *name,cst_item *t)
     return r;
 
 }
-
-
-

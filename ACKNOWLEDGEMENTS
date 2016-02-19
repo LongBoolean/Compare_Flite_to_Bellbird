@@ -1,3 +1,27 @@
+Bellbird contains code from a number of projects. The largest
+component of code orginated from:
+
+         Flite for Android's version of:
+         Flite: a small run-time speech synthesis engine
+                      version 1.5.6-current
+
+Bellbird also contains code from:
+-flite 2.0 (Dec 2014)
+-hts_engine 1.08 (Dec 2013)
+-flite+hts 1.04 (Dec 2012)
+
+We would like to acknowledge the work of the projects on which bellbird's
+source was based without which bellbird would not be possible. In numerous
+cases changes in bellbird are slight compared to the original projects which
+performed the "heavy lifting". The largest acknowledgement goes to Prof. Alan
+W. Black, the key author of flite.
+
+The direct contributors to bellbird have included:
+Peter Drysdale
+Sergio Oller
+
+
+We also include acknowledgements from flite which are relevant to Bellbird:
 
 The initial development of flite was primarily done by awb while
 travelling, perhaps the name is doubly appropriate as a substantial
@@ -6,8 +30,7 @@ time awb was funded by the Language Technonologies Institute at
 Carnegie Mellon University.
 
 Kevin A. Lenzo was involved in the design, conversion techniques and
-representions for the voice distributed with flite (as well as being
-the actual kal voice itself).
+representions for the voice distributed with flite.
 
 Other contributions are:
 
@@ -35,39 +58,21 @@ Marcela Charfuelan (DFKI)
    but we understood the technqiues from Marcela's Open Mary Java code and
    implemented them in our optimized version of MLSA.
 David Huggins-Daines (dhd@cepstral.com) 
-   much of the clunits code, porting to multiple platforms, substantial
-   code tidy up and configure/autoconf guidance.
+   porting to multiple platforms, substantial code tidy up.
 Cepstral, LLC (http://cepstral.com)
    For supporting DHD to spend time (in 2001) on flite and passing
-   back the important early fixes and enhancements including SAPI
-   support (funded by Portuguese FCT to produce an open source
-   synthesis solution).
+   back the important early fixes and enhancements.
 Willie Walker <william.walker@sun.com> and the rest of the Sun Speech Group
    lots of low level bugs (and fixes).
-Portuguese Foundation for Science and Technology (FCT) Praxis XXI program
-   The SAPI interface provided by Cepstral, LLC was partially funded by
-   the above program.
-Craig Reese: IDA/Supercomputing Research Center
-Joe Campbell: Department of Defense
-   who wrote the ulaw conversion routines in src/speech/cst_wave_utils.c
 Mario Lang:
    causing the support of shared libraries to happen
 Eric House (fixin@peak.org)
    who provided examples of how to do 68K Call Backs for system functions
-Greg Parker gparker@sealiesoftware.com
-   peal, the binding glue and shared library foo for getting the arm 
-   version doing something reasonable under PalmOS
 Lukas Loehrer <loehrerl@gmx.net> Feb 2006
    alsa support (default if available)
 Udhyakumar N
    For making the mixed excitation code work, and show its value
-Brian Langner
-   redid the Visual Studio support
 Alok Parlikar
-   Android support, and cg voice dumping (and loading), indic support
+   cg voice loading
 Gopala Anumanchipalli
-   spamf0 support, unitran integration
-Richard Sproat and Kyoung-young Kim (UIUC)
-   Unitran: unicode to sampa grapheme mapping tables
-Sun Microsystems
-   g72x code
+   spamf0 support

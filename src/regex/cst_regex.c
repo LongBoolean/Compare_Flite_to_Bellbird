@@ -50,13 +50,6 @@ const cst_regex *const cst_regex_table[] = {
 
 static char *regularize(const char *unregex,int match);
 
-void cst_regex_init()
-{
-    /* no need to initialize regexes anymore, they are pre-compiled */
-
-    return;
-}
-
 int cst_regex_match(const cst_regex *r, const char *str)
 {
     cst_regstate *s;
@@ -68,14 +61,6 @@ int cst_regex_match(const cst_regex *r, const char *str)
 	return 1;
     } else
 	return 0;
-}
-
-cst_regstate *cst_regex_match_return(const cst_regex *r, const char *str)
-{
-    if (r == NULL) 
-        return 0;
-
-    return hs_regexec(r, str);
 }
 
 cst_regex *new_cst_regex(const char *str)
@@ -100,10 +85,10 @@ void delete_cst_regex(cst_regex *r)
 /* These define the different escape conventions for the FSF's */
 /* regexp code and Henry Spencer's */
 
-static const char * const fsf_magic="^$*+?[].\\";
-static const char * const fsf_magic_backslashed="()|<>";
-static const char * const spencer_magic="^$*+?[].()|\\\n";
-static const char * const spencer_magic_backslashed="<>";
+static const char *fsf_magic="^$*+?[].\\";
+static const char *fsf_magic_backslashed="()|<>";
+static const char *spencer_magic="^$*+?[].()|\\\n";
+static const char *spencer_magic_backslashed="<>";
 
 /* Adaptation of rjc's mapping of fsf format to henry spencer's format */
 /* of escape sequences, as taken from EST_Regex.cc in EST              */
@@ -119,7 +104,7 @@ static char *regularize(const char *unregex,int match)
     if (match && *ex != '^')
 	*(r++) = '^';
 
-    for(e=ex; *e ; e++)
+    for (e=ex; *e ; e++)
     {
 	if (*e == '\\' && !last_was_bs)
 	{

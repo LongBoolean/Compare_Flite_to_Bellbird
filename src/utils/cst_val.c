@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -37,15 +43,55 @@
 /*  Typed values                                                          */
 /*                                                                       */
 /*************************************************************************/
-#include "cst_math.h"
+#include <math.h>
 #include "cst_file.h"
+#include "cst_alloc.h"
+#include "cst_error.h"
 #include "cst_val.h"
 #include "cst_string.h"
 #include "cst_tokenstream.h"
+#include "bell_file.h"
+
+/* Private unsafe accessor macros */
+#define CST_VAL_STRING_LVAL(X) ((X)->c.a.v.vval)
+#define CST_VAL_TYPE(X) ((X)->c.a.type)
+#define CST_VAL_INT(X) ((X)->c.a.v.ival)
+#define CST_VAL_FLOAT(X) ((X)->c.a.v.fval)
+#define CST_VAL_STRING(X) ((const char *)(CST_VAL_STRING_LVAL(X)))
+#define CST_VAL_VOID(X) ((X)->c.a.v.vval)
+#define CST_VAL_CAR(X) ((X)->c.cc.car)
+#define CST_VAL_CDR(X) ((X)->c.cc.cdr)
+
+#define CST_VAL_REFCOUNT(X) ((X)->c.a.ref_count)
 
 static cst_val *new_val()
 {
     return cst_alloc(struct cst_val_struct,1);
+}
+
+static int val_dec_refcount(const cst_val *b)
+{
+    cst_val *wb;
+
+    wb = (cst_val *)(void *)b;
+
+    if (CST_VAL_REFCOUNT(wb) == -1) 
+	/* or is a cons cell in the text segment, how do I do that ? */
+	return -1;
+    else if (cst_val_consp(wb)) /* we don't ref count cons cells */
+	return 0;
+    else if (CST_VAL_REFCOUNT(wb) == 0)
+    {
+	/* Otherwise, trying to free a val outside an
+           item/relation/etc has rather the opposite effect from what
+           you might have intended... */
+	return 0;
+    }
+    else
+    {
+	CST_VAL_REFCOUNT(wb) -= 1;
+	return 	CST_VAL_REFCOUNT(wb);
+    }
 }
 
 cst_val *int_val(int i)
@@ -89,20 +135,6 @@ cst_val *val_new_typed(int type,void *vv)
     CST_VAL_TYPE(v) = type;
     CST_VAL_VOID(v) = vv;
     return v;
-}
-
-void delete_val_list(cst_val *v)
-{
-    if (v)
-    {
-	if (cst_val_consp(v))
-	{
-	    delete_val_list(CST_VAL_CDR(v));
-	    cst_free(v);
-	}
-	else
-	    delete_val(v);
-    }
 }
 
 void delete_val(cst_val *v)
@@ -218,42 +250,12 @@ void *val_generic(const cst_val *v, int type, const char *stype)
     return NULL;
 }
 
-void *val_void(const cst_val *v)
-{
-    /* The scary, do anything function, this shouldn't be called by mortals */
-    if ((v == NULL) ||
-	(CST_VAL_TYPE(v) == CST_VAL_TYPE_CONS) ||
-	(CST_VAL_TYPE(v) == CST_VAL_TYPE_INT) ||
-	(CST_VAL_TYPE(v) == CST_VAL_TYPE_FLOAT))
-    {
-	cst_errmsg("VAL: tried to access void in %d typed val\n",
-		   (v ? CST_VAL_TYPE(v) : -1));
-	cst_error();
-	return NULL;
-    }
-    else 
-	return CST_VAL_VOID(v);
-}
-
 int cst_val_consp(const cst_val *v)
 {
     /* To keep a val cell down to 8 bytes we identify non-cons cells  */
     /* with non-zero values in the least significant bit of the first */
     /* address in the cell (this is a standard technique used on Lisp */
     /* machines)                                                      */
-#if 0
-    void *t;
-    int t1;
-
-    /* Hmm this still isn't right (it can be) but this isn't it */
-    t = CST_VAL_CAR(v);
-    t1 = *(int *)&t;
-
-    if ((t1&0x1) == 0)
-	return TRUE;
-    else
-	return FALSE;
-#endif
     const cst_val_atom *t;
 
     t = (const cst_val_atom *)v;
@@ -261,28 +263,6 @@ int cst_val_consp(const cst_val *v)
       return TRUE;
     else
       return FALSE;
-}
-
-const cst_val *set_cdr(cst_val *v1, const cst_val *v2)
-{
-    /* destructive set cdr, be careful you have a pointer to current cdr */
-    
-    if (!cst_val_consp(v1))
-    {
-	cst_errmsg("VAL: tried to set cdr of non-consp cell\n");
-	cst_error();
-	return NULL;
-    }
-    else
-    {
-        if (CST_VAL_CDR(v1))
-        {
-            val_dec_refcount(CST_VAL_CDR(v1));
-            val_inc_refcount(v1);
-        }
-	CST_VAL_CDR(v1) = (cst_val *)v2;
-    }
-    return v1;
 }
 
 const cst_val *set_car(cst_val *v1, const cst_val *v2)
@@ -304,40 +284,44 @@ const cst_val *set_car(cst_val *v1, const cst_val *v2)
     return v1;
 }
 
-void val_print(cst_file fd,const cst_val *v)
+#if defined(CART_DEBUG) || defined(SSML_DEBUG)
+
+void val_print(const cst_val *v)
 {
     const cst_val *p;
 
     if (v == NULL)
-	cst_fprintf(fd,"[null]");
+	bell_fprintf(stderr,"[null]");
     else if (CST_VAL_TYPE(v) == CST_VAL_TYPE_INT)
-	cst_fprintf(fd,"%d",val_int(v));
+	bell_fprintf(stderr,"%d",val_int(v));
     else if (CST_VAL_TYPE(v) == CST_VAL_TYPE_FLOAT)
-	cst_fprintf(fd,"%f",val_float(v));
+	bell_fprintf(stderr,"%f",val_float(v));
     else if (CST_VAL_TYPE(v) == CST_VAL_TYPE_STRING)
-	cst_fprintf(fd,"%s",val_string(v));
+	bell_fprintf(stderr,"%s",val_string(v));
     else if (cst_val_consp(v))
     {
-	cst_fprintf(fd,"(");
+	bell_fprintf(stderr,"(");
 	for (p=v; p; )
 	{
-	    val_print(fd,val_car(p));
+	    val_print(val_car(p));
 	    p=val_cdr(p);
 	    if (p)
-		cst_fprintf(fd," ");
+		bell_fprintf(stderr," ");
             if (p && !cst_val_consp(p))  /* dotted pairs for non-list */
             {                            
-                cst_fprintf(fd,". ");
-                val_print(fd,p);
+                bell_fprintf(stderr,". ");
+                val_print(p);
                 break;
             }
 	}
-	cst_fprintf(fd,")");
+	bell_fprintf(stderr,")");
     }
     else 
-	cst_fprintf(fd,"[Val %s 0x%p]",
+	bell_fprintf(stderr,"[Val %s 0x%p]",
 		cst_val_defs[CST_VAL_TYPE(v)/2].name,CST_VAL_VOID(v));
 }
+
+#endif // defined(CART_DEBUG) || defined(SSML_DEBUG)
 
 cst_val *val_reverse(cst_val *l)
 {   /* destructively reverse the list */
@@ -400,40 +384,6 @@ int val_equal(const cst_val *v1, const cst_val *v2)
 	return FALSE;
 }
 
-int val_less(const cst_val *v1, const cst_val *v2)
-{
-    return val_float(v1) < val_float(v2);
-}
-
-int val_greater(const cst_val *v1,const cst_val *v2)
-{
-    return val_float(v1) > val_float(v2);
-}
-
-int val_member(const cst_val *v1,const cst_val *l)
-{
-    const cst_val *i;
-
-    for (i=l; i; i=val_cdr(i))
-    {
-	if (val_equal(val_car(i),v1))
-	    return TRUE;
-    }
-    return FALSE;
-}
-
-int val_member_string(const char *v1,const cst_val *l)
-{
-    const cst_val *i;
-
-    for (i=l; i; i=val_cdr(i))
-    {
-	if (cst_streq(v1,val_string(val_car(i))))
-	    return TRUE;
-    }
-    return FALSE;
-}
-
 cst_val *val_inc_refcount(const cst_val *b)
 {
     cst_val *wb;
@@ -450,200 +400,6 @@ cst_val *val_inc_refcount(const cst_val *b)
     return wb;
 }
 
-int val_dec_refcount(const cst_val *b)
-{
-    cst_val *wb;
-
-    wb = (cst_val *)(void *)b;
-
-    if (CST_VAL_REFCOUNT(wb) == -1) 
-	/* or is a cons cell in the text segment, how do I do that ? */
-	return -1;
-    else if (cst_val_consp(wb)) /* we don't ref count cons cells */
-	return 0;
-    else if (CST_VAL_REFCOUNT(wb) == 0)
-    {
-	/* Otherwise, trying to free a val outside an
-           item/relation/etc has rather the opposite effect from what
-           you might have intended... */
-	return 0;
-    }
-    else
-    {
-	CST_VAL_REFCOUNT(wb) -= 1;
-	return 	CST_VAL_REFCOUNT(wb);
-    }
-}
-
-inline int utf8_sequence_length(char c0)
-{
-    // Get the expected length of UTF8 sequence given its most
-    // significant byte
-    return (( 0xE5000000 >> (( c0 >> 3 ) & 0x1E )) & 3 ) + 1;
-}
-
-cst_val *cst_utf8_explode(const cst_string *utf8string)
-{
-  // Return a list of utf8 characters as strings
-  cst_val *chars=NULL;
-  
-  const unsigned char *str = (const unsigned char*)utf8string;
-  char utf8char[5];
-  char c0;
-  int charlength;
-
-  while ((c0 = *str))
-  {
-    charlength = utf8_sequence_length(c0);
-    snprintf(utf8char, charlength + 1, "%s", str);
-    chars = cons_val(string_val(utf8char),chars);
-    str += charlength;
-  }
-  return val_reverse(chars);
-}
-
-static int utf8_ord(const char *utf8_seq) {
-  unsigned int len;
-  int ord;
-
-  unsigned char c0, c1, c2, c3;  // Potential bytes in the UTF8 symbol
-  c0 = utf8_seq[0];
-  len = utf8_sequence_length(c0);
-
-  // Make sure the string sequence we received matches with the
-  // expected length, and that the expected length is nonzero.
-  if ( (len == 0) ||
-       (len != strlen(utf8_seq))) {
-    return -1;
-  }
-
-  if (len == 1) {
-    // ASCII sequence.
-    return c0;
-  }
-
-  c1 = utf8_seq[1];
-  if (len == 2) {
-    ord = ((c0 & 0x1F) << 6) | (c1 & 0x3F);
-    if (ord < 0x80)
-      return -1;
-    return ord;
-  }
-
-  c2 = utf8_seq[2];
-  if (len == 3) {
-    if ((c2 & 0xC0) != 0x80)
-      return -1;
-    ord = ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
-    if (ord < 0x800 ||
-        (ord >= 0xD800 && ord <= 0xDFFF))
-      return -1;
-    return ord;
-  }
-
-  c3 = utf8_seq[3];
-  if (len == 4) {
-    if ((c3 & 0xC0) != 0x80)
-      return -1;
-    ord =
-        ((c0 & 0x7) << 18) | ((c1 & 0x3F) << 12) |
-        ((c2 & 0x3F) << 6) | (c3 & 0x3F);
-    if (ord < 0x10000 || ord > 0x10FFFF)
-      return -1;
-    return ord;
-  }
-
-  return -1;
-}
-
-cst_val *cst_utf8_ord(const cst_val *utf8_char) {
-  const char *ch=(const char *)val_string(utf8_char);
-  return int_val(utf8_ord(ch));
-}
-int cst_utf8_ord_string(const char *utf8_char)
-{
-    return utf8_ord(utf8_char);
-}
-
-static int utf8_chr(int ord, char* utf8char) {
-  unsigned int utf8len;
-  int i = 0;
-
-  if (ord < 0x80) {
-    utf8len = 1;
-  } else if (ord < 0x800) {
-    utf8len = 2;
-  } else if (ord <= 0xFFFF) {
-    utf8len = 3;
-  } else if (ord <= 0x200000) {
-    utf8len = 4;
-  } else {
-    // Replace invalid character with FFFD
-    utf8len = 2;
-    ord = 0xFFFD;
-  }
-
-  i = utf8len;  // Index into utf8char
-  utf8char[i--] = 0;
-
-  switch (utf8len) {
-    // These fallthrough deliberately
-    case 6:
-      utf8char[i--] = (ord | 0x80) & 0xBF;
-      ord >>= 6;
-    case 5:
-      utf8char[i--] = (ord | 0x80) & 0xBF;
-      ord >>= 6;
-    case 4:
-      utf8char[i--] = (ord | 0x80) & 0xBF;
-      ord >>= 6;
-    case 3:
-      utf8char[i--] = (ord | 0x80) & 0xBF;
-      ord >>= 6;
-    case 2:
-      utf8char[i--] = (ord | 0x80) & 0xBF;
-      ord >>= 6;
-    case 1:
-      switch (utf8len) {
-        case 0:
-        case 1:
-          utf8char[i--] = ord;
-          break;
-        case 2:
-          utf8char[i--] = ord | 0xC0;
-          break;
-        case 3:
-          utf8char[i--] = ord | 0xE0;
-          break;
-        case 4:
-          utf8char[i--] = ord | 0xF0;
-      }
-  }
-  return utf8len;
-}
-
-cst_val *cst_utf8_chr(const cst_val *ord) {
-  char ch[5];
-  int utf8len;
-
-  utf8len = utf8_chr(val_int(ord),ch);
-  if (utf8len == 0) {
-    return 0;
-  }
-
-  return string_val(ch);
-}
-
-int val_stringp(const cst_val *v)
-{
-    if (cst_val_consp(v))
-        return FALSE;
-    else if (CST_VAL_TYPE(v) == CST_VAL_TYPE_STRING)
-        return TRUE;
-    else
-        return FALSE;
-}
-
 const cst_val *val_assoc_string(const char *v1,const cst_val *al)
 {
     const cst_val *i;
@@ -654,30 +410,6 @@ const cst_val *val_assoc_string(const char *v1,const cst_val *al)
 	    return val_car(i);
     }
     return NULL;
-}
-
-cst_string *cst_implode(const cst_val *sl)
-{
-    const cst_val *v;
-    int l=0;
-    char *s;
-
-    for (v=sl; v; v=val_cdr(v))
-    {
-        if (val_stringp(val_car(v)))
-            l += cst_strlen(val_string(val_car(v)));
-    }
-
-    s = cst_alloc(cst_string,l+1);
-
-    for (v=sl; v; v=val_cdr(v))
-    {
-        if (val_stringp(val_car(v)))
-            cst_sprintf(s,"%s%s",s,val_string(val_car(v)));
-
-    }
-
-    return s;
 }
 
 cst_val *val_readlist_string(const char *str)
@@ -702,6 +434,3 @@ cst_val *val_readlist_string(const char *str)
 
     return val_reverse(v);
 }
-
-
-

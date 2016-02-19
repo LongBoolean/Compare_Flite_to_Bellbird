@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -38,6 +44,7 @@
 /*                                                                       */
 /*************************************************************************/
 #include "cst_alloc.h"
+#include "cst_error.h"
 #include "cst_item.h"
 #include "cst_relation.h"
 #include "cst_utterance.h"
@@ -48,24 +55,41 @@ CST_VAL_REGISTER_TYPE_NODEL(item,cst_item)
 CST_VAL_REGISTER_TYPE(utterance,cst_utterance)
 CST_VAL_REGISTER_FUNCPTR(itemfunc,cst_itemfunc)
 
-cst_item *new_item_relation(cst_relation *r,cst_item *i)
+static void item_unref_contents(cst_item *item)
 {
-    cst_item *ni;
+    /* unreference this item from contents, and delete contents */
+    /* if no one else is referencing it                         */
 
-    ni = cst_utt_alloc(r->utterance, cst_item, 1);
-    ni->contents = 0;
-    ni->n = ni->p = ni->u = ni->d = 0;
-    ni->relation = r;
-    item_contents_set(ni,i);
-    return ni;
+    if (item && item->contents)
+    {
+	feat_remove(item->contents->relations,item->relation->name);
+	if (feat_length(item->contents->relations) == 0)
+	{
+	    delete_features(item->contents->relations);
+	    delete_features(item->contents->features);
+	    cst_free(item->contents);
+	}
+	item->contents = NULL;
+    }
 }
 
-void item_contents_set(cst_item *current, cst_item *i)
+static cst_item_contents *new_item_contents(void)
+{
+    cst_item_contents *ic;
+
+    ic = cst_alloc(cst_item_contents,1);
+    ic->features = new_features();
+    ic->relations = new_features();
+
+    return ic;
+}
+
+static void item_contents_set(cst_item *current, cst_item *i)
 {
     cst_item_contents *c = 0;
     cst_item *nn_item;
     if (i == 0)
-	c = new_item_contents(current);
+	c = new_item_contents();
     else
 	c = i->contents;
     if (c != current->contents)
@@ -90,6 +114,18 @@ void item_contents_set(cst_item *current, cst_item *i)
     }
 }
 
+cst_item *new_item_relation(cst_relation *r,cst_item *i)
+{
+    cst_item *ni;
+
+    ni = cst_alloc(cst_item, 1);
+    ni->contents = 0;
+    ni->n = ni->p = ni->u = ni->d = 0;
+    ni->relation = r;
+    item_contents_set(ni,i);
+    return ni;
+}
+
 void delete_item(cst_item *item)
 {
     cst_item *ds, *nds;
@@ -101,14 +137,9 @@ void delete_item(cst_item *item)
     }
     if (item->p != NULL) item->p->n = item->n;
     if (item->u != NULL) item->u->d = item->n; /* when first daughter */
-    
-    if (item->relation)
-    {
-	if (item->relation->head == item)
-	    item->relation->head = item->n;
-	if (item->relation->tail == item)
-	    item->relation->tail = item->p;
-    }
+
+    if (item->relation->head == item) item->relation->head = item->n;
+    if (item->relation->tail == item) item->relation->tail = item->p;
 
     /* Delete all the daughters of item */
     for (ds = item->d; ds; ds=nds)
@@ -118,36 +149,7 @@ void delete_item(cst_item *item)
     }
     
     item_unref_contents(item);
-    cst_utt_free(item->relation->utterance, item);
-}
-
-void item_unref_contents(cst_item *item)
-{
-    /* unreference this item from contents, and delete contents */
-    /* if no one else is referencing it                         */
-
-    if (item && item->contents)
-    {
-	feat_remove(item->contents->relations,item->relation->name);
-	if (feat_length(item->contents->relations) == 0)
-	{
-	    delete_features(item->contents->relations);
-	    delete_features(item->contents->features);
-	    cst_utt_free(item->relation->utterance,item->contents);
-	}
-	item->contents = NULL;
-    }
-}
-
-cst_item_contents *new_item_contents(cst_item *i)
-{
-    cst_item_contents *ic;
-
-    ic = cst_utt_alloc(i->relation->utterance,cst_item_contents,1);
-    ic->features = new_features_local(i->relation->utterance->ctx);
-    ic->relations = new_features_local(i->relation->utterance->ctx);
-
-    return ic;
+    cst_free(item);
 }
 
 cst_item *item_as(const cst_item *i,const char *rname)
@@ -194,6 +196,8 @@ cst_item *item_append(cst_item *current, cst_item *ni)
     if (ni && (ni->relation == current->relation))
     {
 	/* got to delete it first as an item can't be in a relation twice */
+	cst_errmsg("item_append: already in relation\n");
+	return 0;
     }
     else
 	rni = new_item_relation(current->relation,ni);
@@ -217,6 +221,8 @@ cst_item *item_prepend(cst_item *current, cst_item *ni)
     if (ni && (ni->relation == current->relation))
     {
 	/* got to delete it first as an item can't be in a relation twice */
+	cst_errmsg("item_prepend: already in relation\n");
+	return 0;
     }
     else
 	rni = new_item_relation(current->relation,ni);
@@ -261,16 +267,6 @@ cst_item *item_daughter(const cst_item *i)
     else 
 	return i->d;
 }
-
-cst_item *item_nth_daughter(const cst_item *i,int n)
-{
-    int d;
-    cst_item *p;
-
-    for (d=0,p=item_daughter(i); p && (d < n); p=item_next(p),d++);
-    return p;
-}
-
 
 cst_item *item_last_daughter(const cst_item *i)
 {

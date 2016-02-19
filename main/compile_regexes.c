@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -42,19 +48,10 @@
 /*************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include <unistd.h>
 
-#include "flite.h"
-
-static void compregex_usage()
-{
-    printf("compregex: compile regexes into C structures\n");
-    printf("usage: compregex name regex\n"
-           "  Compiles regex into a C structure called name\n");
-    exit(0);
-}
+#include "cst_regex.h"
 
 static void regex_to_C(const char *name, const cst_regex *rgx)
 {
@@ -72,9 +69,18 @@ static void regex_to_C(const char *name, const cst_regex *rgx)
     printf("%d, ",rgx->regstart);
     printf("%d, ",rgx->reganch);
     if (rgx->regmust == NULL)
+    {
         printf("NULL, ");
+    }
     else
-        printf("%s_rxprog + %ld, ", name, (long int)(rgx->regmust - rgx->program));
+    {
+#ifndef BELL_WINDOWS
+        printf("%s_rxprog + %td, ", name, rgx->regmust - rgx->program);
+#else
+        printf("%s_rxprog + %Id, ", name, rgx->regmust - rgx->program);
+#endif
+    }
+
     printf("%d, ",rgx->regmlen);
     printf("%d,\n   ",rgx->regsize);
     printf("(char *)%s_rxprog\n",name);
@@ -88,7 +94,11 @@ int main(int argc, char **argv)
     cst_regex *rgx;
 
     if (argc != 3)
-        compregex_usage();
+    {
+        printf("Usage: compile_regexes name regex\n"
+               "  Compiles regex into a C structure called name\n");
+        exit(0);
+    }
 
     rgx = new_cst_regex(argv[2]);
     regex_to_C(argv[1],rgx);

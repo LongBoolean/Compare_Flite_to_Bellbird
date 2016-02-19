@@ -40,7 +40,6 @@
 #ifndef _CST_ITEM_H__
 #define _CST_ITEM_H__
 
-#include "cst_file.h"
 #include "cst_features.h"
 
 /* Everyone needs these so forward define these */
@@ -69,13 +68,9 @@ struct cst_item_struct {
 
 /* Constructor functions */
 cst_item *new_item_relation(cst_relation *r,cst_item *i);
-cst_item_contents *new_item_contents(cst_item *i);
 
 /* Remove this item from this references */
 void delete_item(cst_item *item);
-
-void item_contents_set(cst_item *current, cst_item *i);
-void item_unref_contents(cst_item *i);
 
 cst_item *item_as(const cst_item *i,const char *rname);
 
@@ -90,13 +85,10 @@ cst_item *item_prepend(cst_item *i,cst_item *new_item);
 
 /* Tree accessor/manipulator function */
 cst_item *item_parent(const cst_item *i);
-cst_item *item_nth_daughter(const cst_item *i,int n);
 cst_item *item_daughter(const cst_item *i);
 cst_item *item_last_daughter(const cst_item *i);
 
 cst_item *item_add_daughter(cst_item *i,cst_item *new_item);
-cst_item *item_append_sibling(cst_item *i,cst_item *new_item);
-cst_item *item_prepend_sibling(cst_item *i,cst_item *new_item);
 
 /* Feature accessor/manipulator functions */
 int item_feat_present(const cst_item *i,const char *name);
@@ -111,7 +103,7 @@ void item_set_int(const cst_item *i,const char *name,int val);
 void item_set_float(const cst_item *i,const char *name,float val);
 void item_set_string(const cst_item *i,const char *name,const char *val);
 
-#define item_name(I) item_feat_string(I,"name")
+#define ITEM_NAME(I) item_feat_string(I,"name")
 
 int item_equal(const cst_item *a, const cst_item *b);
 
@@ -123,10 +115,8 @@ cst_item* path_to_item(const cst_item *item,const char *featpath);
 
 /* Feature function, for features that are derived algorithmically from others. */
 typedef const cst_val *(*cst_ffunction)(const cst_item *i);
-CST_VAL_USER_FUNCPTR_DCLS(ffunc,cst_ffunction)
-void ff_register(cst_features *ffeatures, const char *name,
+void ff_register(cst_ffunction *ffeatures, const char *name,
 			   cst_ffunction f);
-void ff_unregister(cst_features *ffeatures, const char *name);
 
 /* Generalized item hook function, like cst_uttfunc. */
 typedef cst_val *(*cst_itemfunc)(cst_item *i);

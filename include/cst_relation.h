@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -40,8 +46,6 @@
 #ifndef _CST_RELATION_H__
 #define _CST_RELATION_H__
 
-#include "cst_file.h"
-#include "cst_val.h"
 #include "cst_features.h"
 #include "cst_item.h"
 #include "cst_utterance.h"
@@ -61,12 +65,7 @@ void delete_relation(cst_relation *r);
 
 cst_item *relation_head(cst_relation *r);
 cst_item *relation_tail(cst_relation *r);
-const char *relation_name(cst_relation *r);
 
 cst_item *relation_append(cst_relation *r,cst_item *i);
-cst_item *relation_prepend(cst_relation *r,cst_item *i);
-
-int relation_load(cst_relation *r, const char *filename);
-int relation_save(cst_relation *r, const char *filename);
 
 #endif

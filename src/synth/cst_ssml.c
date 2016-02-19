@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -47,9 +53,8 @@
 /*  <audio ...> </audio>                                                 */
 /*  <!-- ... -->                                                         */
 /*  <break .../>                                                         */
-/*  <prosody ...> </prosody>  rate volume (no pitch yet)                 */
+/*  <prosody ...> </prosody>  pitch rate duration volume                 */
 /*  <emphasis ...> </emphasis>                                           */
-/*  <sub alias="World Wide Web Consortium">W3C</sub>                     */
 /*  <phoneme ph="x x x"> </phoneme>                                      */
 /*                                                                       */
 /*  <...> ignore all others                                              */
@@ -58,12 +63,15 @@
 /*  voices are selected                                                  */
 /*                                                                       */
 /*************************************************************************/
-
-#include "flite.h"
+#include "cst_error.h"
+#include "cst_synth.h"
 #include "cst_tokenstream.h"
+#include "flite.h"
+#include "bell_file.h"
+#include "bell_relation_sym.h"
 
-static const char * const ssml_singlecharsymbols_general = "<>&/\";";
-static const char * const ssml_singlecharsymbols_inattr = "=>;/\"";
+static const char *ssml_singlecharsymbols_general = "<>&/\";";
+static const char *ssml_singlecharsymbols_inattr = "=>;/\"";
 
 #define SSML_DEBUG 0
 
@@ -80,37 +88,22 @@ static cst_features *ssml_get_attributes(cst_tokenstream *ts)
 {
     cst_features *a = new_features();
     const char* name, *val;
-    const char *fnn,*vnn;
-    int i=0;
 
-    set_charclasses(ts,
-                    ts->p_whitespacesymbols,
-                    ssml_singlecharsymbols_inattr,
-                    ts->p_prepunctuationsymbols,
-                    ts->p_postpunctuationsymbols);
+    set_singlecharsymbols(ts, ssml_singlecharsymbols_inattr);
 
     name = ts_get(ts);
     while (!cst_streq(">",name))
     {
-        /* I want names and values to be const */
-        if (i == 0)
-        {
-            fnn="_name0"; vnn="_val0";
-        }
-        else
-        {
-            fnn="_name1"; vnn="_val1";
-        }
 	if (cst_streq(name,"/"))
 	    feat_set_string(a,"_type","startend");
 	else
 	{
 	    feat_set_string(a,"_type","start");
-	    feat_set_string(a,fnn,name);
+	    feat_set_string(a,"_name0",name);
 	    if (cst_streq("=",ts_get(ts)))
 	    {
                 val = ts_get_quoted_remainder(ts);
-                feat_set_string(a,vnn,val);
+                feat_set_string(a,"_val0",val);
             }
 	}
 	if (ts_eof(ts))
@@ -120,14 +113,9 @@ static cst_features *ssml_get_attributes(cst_tokenstream *ts)
 	    return 0;
 	}
         name = ts_get(ts);
-        i++;
     }
 	
-    set_charclasses(ts,
-                    ts->p_whitespacesymbols,
-                    ssml_singlecharsymbols_general,
-                    ts->p_prepunctuationsymbols,
-                    ts->p_postpunctuationsymbols);
+    set_singlecharsymbols(ts, ssml_singlecharsymbols_general);
 
     return a;
 }
@@ -135,12 +123,9 @@ static cst_features *ssml_get_attributes(cst_tokenstream *ts)
 static cst_utterance *ssml_apply_tag(const char *tag,
                                      cst_features *attributes,
                                      cst_utterance *u,
-                                     cst_features *word_feats,
-                                     cst_features *feats)
+                                     cst_features *word_feats)
 {
     const char *wavefilename;
-    const char *vname;
-    cst_voice *nvoice;
     cst_wave *wave;
     cst_item *t;
     cst_relation *r;
@@ -148,7 +133,7 @@ static cst_utterance *ssml_apply_tag(const char *tag,
 
 #if SSML_DEBUG
     printf("SSML TAG %s\n",tag);
-    cst_feat_print(stdout,attributes);
+    bell_feat_print(attributes);
     printf("...\n");
 #endif
 
@@ -159,17 +144,15 @@ static cst_utterance *ssml_apply_tag(const char *tag,
         {
             wavefilename = feat_string(attributes,"_val0");
             wave = new_wave();
-            if (cst_wave_load_riff(wave,wavefilename) == CST_OK_FORMAT)
+            if (cst_wave_load_riff(wave,wavefilename) == BELL_IO_SUCCESS)
             {
                 if (cst_streq("start",feat_string(attributes,"_type")))
                 {
                     feat_set_string(word_feats,"ssml_comment","1");
                 }
-                feat_set(word_feats,"ssml_play_audio",wave_val(wave));
+                feat_set(word_feats,"ssml_play_audio",userdata_val(wave));
+                return NULL; /* Cause eou */
             }
-            else
-                delete_wave(wave);
-            return NULL; /* Cause eou */
         }
         else if (cst_streq("end",feat_string(attributes,"_type")))
         {
@@ -180,11 +163,11 @@ static cst_utterance *ssml_apply_tag(const char *tag,
     else if (cst_streq("BREAK",tag))
     {
         if (u && 
-            ((r = utt_relation(u,"Token")) != NULL) &&
+            ((r = utt_relation(u,TOKEN)) != NULL) &&
             ((t = relation_tail(r)) != NULL))
         {
             item_set_string(t,"break","1");
-            /* cst_feat_print(stdout,attributes); */
+            /* bell_feat_print(attributes); */
             if (cst_streq("size",get_param_string(attributes,"_name0","")))
             {
                 break_size=feat_float(attributes,"_val0");
@@ -203,17 +186,10 @@ static cst_utterance *ssml_apply_tag(const char *tag,
             if (cst_streq("rate",get_param_string(attributes,"_name1","")))
                 feat_set_float(word_feats,"local_duration_stretch",
                                1.0/feat_float(attributes,"_val1"));
-            if (cst_streq("volume",get_param_string(attributes,"_name0","")))
-                feat_set_float(word_feats,"local_gain",
-                               feat_float(attributes,"_val0")/100.0);
-            if (cst_streq("volume",get_param_string(attributes,"_name1","")))
-                feat_set_float(word_feats,"local_gain",
-                               feat_float(attributes,"_val1")/100.0);
         }
         else if (cst_streq("end",feat_string(attributes,"_type")))
         {
             feat_remove(word_feats,"local_duration_stretch");
-            feat_remove(word_feats,"local_gain");
         }
 
     }
@@ -233,41 +209,6 @@ static cst_utterance *ssml_apply_tag(const char *tag,
             feat_remove(word_feats,"phones");
         }
 
-    }
-    else if (cst_streq("SUB",tag))
-    {
-        if (cst_streq("start",feat_string(attributes,"_type")))
-        {
-            if (cst_streq("alias",get_param_string(attributes,"_name0","")))
-            {
-                const char *alias;
-                alias = feat_string(attributes,"_val0");
-                feat_set_string(word_feats,"ssml_alias",alias);
-            }
-        }
-        else if (cst_streq("end",feat_string(attributes,"_type")))
-        {
-            feat_remove(word_feats,"ssml_alias");
-        }
-
-    }
-    else if (cst_streq("VOICE",tag))
-    {
-        if (cst_streq("start",feat_string(attributes,"_type")))
-        {
-            vname = get_param_string(attributes,"_val0","");
-            nvoice = flite_voice_select(vname);
-            feat_set(feats,"current_voice",userdata_val(nvoice));
-            return NULL;  /* cause an utterance break */
-        }
-        else if (cst_streq("end",feat_string(attributes,"_type")))
-        {
-            /* Hmm we should really have a stack of these */
-            nvoice = 
-            (cst_voice *)val_userdata(feat_val(feats,"default_voice"));
-            feat_set(feats,"current_voice",userdata_val(nvoice));
-            return NULL;
-        }
     }
 
     /* do stuff */
@@ -305,19 +246,13 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
     cst_item *t;
     cst_voice *current_voice; 
     int ssml_eou = 0;
-    const cst_wave *wave;
-    cst_wave *w;
+    cst_wave *wave, *w;
 
     ssml_feats = new_features();
     feat_set(ssml_feats,"current_voice",userdata_val(voice));
     feat_set(ssml_feats,"default_voice",userdata_val(voice));
     ssml_word_feats = new_features();
-    set_charclasses(ts,
-                    " \t\n\r",
-                    ssml_singlecharsymbols_general,
-                    get_param_string(voice->features,"text_prepunctuation",""),
-                    get_param_string(voice->features,"text_postpunctuation","")
-                    );
+    set_singlecharsymbols(ts, ssml_singlecharsymbols_general);
 
     if (feat_present(voice->features,"utt_break"))
 	breakfunc = val_breakfunc(feat_val(voice->features,"utt_break"));
@@ -327,13 +262,13 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
 
     /* If its a file to write to, create and save an empty wave file */
     /* as we are going to incrementally append to it                 */
-    if (!cst_streq(outtype,"play") && 
-        !cst_streq(outtype,"none") &&
-        !cst_streq(outtype,"stream"))
+    if (!cst_streq(outtype,"play") &&
+        !cst_streq(outtype,"bufferedplay") &&
+        !cst_streq(outtype,"none"))
     {
 	w = new_wave();
 	cst_wave_resize(w,0,1);
-	cst_wave_set_sample_rate(w,16000);
+	CST_WAVE_SET_SAMPLE_RATE(w,16000);
 	cst_wave_save_riff(w,outtype);  /* an empty wave */
 	delete_wave(w);
     }
@@ -341,7 +276,7 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
     num_tokens = 0;
     utt = new_utterance();
 
-    tokrel = utt_relation_create(utt, "Token");
+    tokrel = utt_relation_create(utt, TOKEN);
     while (!ts_eof(ts) || num_tokens > 0)
     {
         current_voice = 
@@ -361,7 +296,7 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
             /* printf("awb_debug tag is %s\n",tag); */
             if (cst_streq("/",tag)) /* an end tag */
             {
-                cst_free(tag); tag=NULL;
+                cst_free(tag);
                 tag = cst_upcase(ts_get(ts));
                 attributes = ssml_get_attributes(ts);
                 feat_set_string(attributes,"_type","end");
@@ -369,7 +304,7 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
             else
                 attributes = ssml_get_attributes(ts);
             token = ts_get(ts);  /* skip ">" */
-	    if (ssml_apply_tag(tag,attributes,utt,ssml_word_feats,ssml_feats))
+	    if (ssml_apply_tag(tag,attributes,utt,ssml_word_feats))
                 ssml_eou = 0;
             else
                 ssml_eou = 1;
@@ -405,24 +340,24 @@ static float flite_ssml_to_speech_ts(cst_tokenstream *ts,
             if (ts_eof(ts)) break;
             
             utt = new_utterance();
-            tokrel = utt_relation_create(utt, "Token");
+            tokrel = utt_relation_create(utt, TOKEN);
             num_tokens = 0;
         }
 
         if (feat_present(ssml_word_feats,"ssml_play_audio"))
         {
-            wave = val_wave(feat_val(ssml_word_feats,"ssml_play_audio"));
+            wave = (cst_wave *)val_userdata(feat_val(ssml_word_feats,"ssml_play_audio"));
             /* Should create an utterances with the waveform in it */
             /* Have to stream it if there is streaming */
             if (utt) delete_utterance(utt);
-            utt = utt_synth_wave(copy_wave(wave),current_voice);
+            utt = utt_synth_wave(wave,current_voice);
             if (utt_user_callback)
                 utt = (utt_user_callback)(utt);
             durs += flite_process_output(utt,outtype,TRUE);
-            delete_utterance(utt); utt = NULL;
+            delete_utterance(utt);
 
             utt = new_utterance();
-            tokrel = utt_relation_create(utt, "Token");
+            tokrel = utt_relation_create(utt, TOKEN);
             num_tokens = 0;
 
             feat_remove(ssml_word_feats,"ssml_play_audio");
@@ -463,10 +398,10 @@ float flite_ssml_file_to_speech(const char *filename,
     float d;
 
     if ((ts = ts_open(filename,
-	      get_param_string(voice->features,"text_whitespace",NULL),
-	      get_param_string(voice->features,"text_singlecharsymbols",NULL),
-	      get_param_string(voice->features,"text_prepunctuation",NULL),
-	      get_param_string(voice->features,"text_postpunctuation",NULL)))
+              cst_ts_default_whitespacesymbols,
+	      get_param_string(voice->features,"text_singlecharsymbols",""),
+	      get_param_string(voice->features,"text_prepunctuation",""),
+	      get_param_string(voice->features,"text_postpunctuation","")))
 	== NULL)
     {
 	cst_errmsg("failed to open file \"%s\" for ssml reading\n",
@@ -479,13 +414,13 @@ float flite_ssml_file_to_speech(const char *filename,
 
     /* If its a file to write to, create and save an empty wave file */
     /* as we are going to incrementally append to it                 */
-    if (!cst_streq(outtype,"play") && 
-        !cst_streq(outtype,"none") &&
-        !cst_streq(outtype,"stream"))
+    if (!cst_streq(outtype,"play") &&
+        !cst_streq(outtype,"bufferedplay") &&
+        !cst_streq(outtype,"none"))
     {
 	w = new_wave();
 	cst_wave_resize(w,0,1);
-	cst_wave_set_sample_rate(w,16000);
+	CST_WAVE_SET_SAMPLE_RATE(w,16000);
 	cst_wave_save_riff(w,outtype);  /* an empty wave */
 	delete_wave(w);
     }
@@ -508,10 +443,10 @@ float flite_ssml_text_to_speech(const char *text,
     float d;
 
     if ((ts = ts_open_string(text,
-	      get_param_string(voice->features,"text_whitespace",NULL),
-	      get_param_string(voice->features,"text_singlecharsymbols",NULL),
-	      get_param_string(voice->features,"text_prepunctuation",NULL),
-	      get_param_string(voice->features,"text_postpunctuation",NULL)))
+              cst_ts_default_whitespacesymbols,
+	      get_param_string(voice->features,"text_singlecharsymbols",""),
+	      get_param_string(voice->features,"text_prepunctuation",""),
+	      get_param_string(voice->features,"text_postpunctuation","")))
 	== NULL)
     {
 	return 1;
@@ -522,13 +457,13 @@ float flite_ssml_text_to_speech(const char *text,
 
     /* If its a file to write to, create and save an empty wave file */
     /* as we are going to incrementally append to it                 */
-    if (!cst_streq(outtype,"play") && 
-        !cst_streq(outtype,"none") &&
-        !cst_streq(outtype,"stream"))
+    if (!cst_streq(outtype,"play") &&
+        !cst_streq(outtype,"bufferedplay") &&
+        !cst_streq(outtype,"none"))
     {
 	w = new_wave();
 	cst_wave_resize(w,0,1);
-	cst_wave_set_sample_rate(w,16000);
+	CST_WAVE_SET_SAMPLE_RATE(w,16000);
 	cst_wave_save_riff(w,outtype);  /* an empty wave */
 	delete_wave(w);
     }
@@ -540,5 +475,4 @@ float flite_ssml_text_to_speech(const char *text,
     return d;
 
 }
-
 

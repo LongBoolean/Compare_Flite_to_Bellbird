@@ -45,7 +45,6 @@
 
 typedef struct lexicon_struct {
     char *name;
-    int num_entries;
     /* Entries are centered around bytes with value 255 */
     /* entries and forward (compressed) pronunciations and backwards */
     /* each are terminated (preceeded in pron case) by 0 */
@@ -58,9 +57,6 @@ typedef struct lexicon_struct {
 
     int (*syl_boundary)(const cst_item *i,const cst_val *p);
     
-    cst_val *(*lts_function)(const struct lexicon_struct *l, const char *word, const char *pos, const cst_features *feats);
-
-    char ***addenda;
     /* ngram frequency table used for packed entries */
     const char * const *phone_hufftable;
     const char * const *entry_hufftable;
@@ -71,19 +67,18 @@ typedef struct lexicon_struct {
 
 } cst_lexicon;
 
-cst_lexicon *new_lexicon();
-void delete_lexicon(cst_lexicon *lex);
+cst_val *cst_lex_load_addenda(const cst_lexicon *lex, const char *lexfile);
 
-cst_val *cst_lex_make_entry(const cst_lexicon *lex, 
-                            const cst_string *entry);
-cst_val *cst_lex_load_addenda(const cst_lexicon *lex, 
-                              const char *lexfile);
+const cst_val *get_entry_lex_addenda(const char *word,
+                                        const cst_val *lex_addenda);
 
-cst_val *lex_lookup(const cst_lexicon *l, const char *word, const char *pos,
-                    const cst_features *feats);
-int in_lex(const cst_lexicon *l, const char *word, const char *pos,
-           const cst_features *feats);
+cst_val *get_phones_lex_addenda(const cst_val *entry);
+
+cst_val *lex_lookup(const cst_lexicon *l, const char *word, const char *pos);
+int in_lex(const cst_lexicon *l, const char *word, const char *pos);
 
 CST_VAL_USER_TYPE_DCLS(lexicon,cst_lexicon)
+
+void delete_lexicon(cst_lexicon *lexicon);
 
 #endif

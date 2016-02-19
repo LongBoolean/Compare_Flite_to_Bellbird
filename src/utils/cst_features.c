@@ -1,4 +1,10 @@
 /*************************************************************************/
+/*                This code has been modified for Bellbird.              */
+/*                See COPYING for more copyright details.                */
+/*                The unmodified source code copyright notice            */
+/*                is included below.                                     */
+/*************************************************************************/
+/*************************************************************************/
 /*                                                                       */
 /*                  Language Technologies Institute                      */
 /*                     Carnegie Mellon University                        */
@@ -40,6 +46,7 @@
 
 #include "cst_error.h"
 #include "cst_features.h"
+#include "bell_file.h"
 
 CST_VAL_REGISTER_TYPE(features,cst_features)
 
@@ -65,17 +72,6 @@ cst_features *new_features(void)
 
     f = cst_alloc(cst_features,1);
     f->head = NULL;
-    f->ctx = NULL;
-    return f;
-}
-
-cst_features *new_features_local(cst_alloc_context ctx)
-{
-    cst_features *f;
-
-    f = (cst_features *)cst_local_alloc(ctx, sizeof(*f));
-    f->head = NULL;
-    f->ctx = ctx;
     return f;
 }
 
@@ -89,21 +85,16 @@ void delete_features(cst_features *f)
 	{
 	    np = n->next;
 	    delete_val(n->val);
-	    cst_local_free(f->ctx,n);
+	    cst_free(n);
 	}
         delete_val(f->owned_strings);
-	cst_local_free(f->ctx,f);
+	cst_free(f);
     }
 }
 
 int feat_present(const cst_features *f, const char *name)
 {
-    if (feat_find_featpair(f,name) != NULL)
-        return 1;
-    else if (f && f->linked)
-        return feat_present(f->linked,name);
-    else 
-        return 0;
+    return (feat_find_featpair(f,name) != NULL);
 }
 
 int feat_length(const cst_features *f)
@@ -134,7 +125,7 @@ int feat_remove(cst_features *f, const char *name)
 		else
 		    p->next = np;
 		delete_val(n->val);
-		cst_local_free(f->ctx,n);
+		cst_free(n);
 		return TRUE;
 	    }
 	}
@@ -163,15 +154,7 @@ const cst_val *feat_val(const cst_features *f, const char *name)
     n = feat_find_featpair(f,name);
 
     if (n == NULL)
-    {
-        if (f && f->linked)
-        {   /* Search the linked features too if there are any */
-            /* We assume the linked features haven't been deleted, and */
-            return feat_val(f->linked,name);
-        }
-        else
-            return NULL; /* its really not there at all */
-    }
+	return NULL;
     else
 	return n->val;
 }
@@ -247,7 +230,7 @@ void feat_set(cst_features *f, const char* name, const cst_val *val)
     else if (n == NULL)
     {   /* first reference to this feature so create new fpair */
 	cst_featvalpair *p;
-	p = (cst_featvalpair *)cst_local_alloc(f->ctx, sizeof(*p));
+	p = cst_alloc(cst_featvalpair,1);
 	p->next = f->head;
         p->name = name;
 	p->val = val_inc_refcount(val);
@@ -265,19 +248,11 @@ int feat_copy_into(const cst_features *from,cst_features *to)
     /* Copy all features in from into to */
     cst_featvalpair *p;
     int i;
-
+    
     for (i=0,p=from->head; p; p=p->next,i++)
 	feat_set(to,p->name,p->val);
     
     return i;
-}
-
-int feat_link_into(const cst_features *from,cst_features *to)
-{
-    /* Thus allows more global features to be linked, without a copy */
-    /* This is used to make things thread safe(r)                    */
-    to->linked = from;
-    return 1;
 }
 
 const char *feat_own_string(cst_features *f,const char *n)
@@ -286,16 +261,20 @@ const char *feat_own_string(cst_features *f,const char *n)
     return val_string(val_car(f->owned_strings));
 }
 
-int cst_feat_print(cst_file fd,const cst_features *f)
+#if defined(CART_DEBUG) || defined(SSML_DEBUG)
+
+int bell_feat_print(const cst_features *f)
 {
     cst_featvalpair *p;
     
     for (p=f->head; p; p=p->next)
     {
-	cst_fprintf(fd, "%s ",p->name);
-	val_print(fd,p->val);
-	cst_fprintf(fd,"\n");
+	bell_fprintf(stderr, "%s ",p->name);
+	val_print(p->val);
+	bell_fprintf(stderr,"\n");
     }
 
     return 0;
 }
+
+#endif // defined(CART_DEBUG) || defined(SSML_DEBUG)
